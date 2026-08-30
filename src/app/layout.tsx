@@ -6,6 +6,13 @@ export const metadata: Metadata = {
   title: "TangkasBoard",
   description: "Manajemen sesi mabar badminton — matchmaking adil & leaderboard",
   manifest: "/manifest.webmanifest",
+  icons: {
+    icon: [
+      { url: "/icons/favicon-48.png", sizes: "48x48", type: "image/png" },
+      { url: "/icons/icon-192.png", sizes: "192x192", type: "image/png" },
+    ],
+    apple: "/icons/icon-192.png",
+  },
   appleWebApp: {
     capable: true,
     statusBarStyle: "default",
