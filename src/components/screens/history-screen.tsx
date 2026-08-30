@@ -1,0 +1,170 @@
+"use client";
+
+import { useMemo, useState } from "react";
+import { Pencil } from "lucide-react";
+import { LevelBadge } from "@/components/ui/level-badge";
+import type { Match, SessionPlayer } from "@/lib/domain/types";
+import { useSessionStore } from "@/lib/store/session-store";
+import { haptic } from "@/lib/haptics";
+import { cn } from "@/lib/utils";
+import { EditScoreDialog } from "@/components/dialogs/edit-score-dialog";
+
+export function HistoryScreen() {
+  const { matches, players } = useSessionStore();
+  const [editFor, setEditFor] = useState<Match | null>(null);
+
+  const byId = useMemo(() => new Map(players.map((p) => [p.id, p])), [players]);
+
+  // hanya match yang sudah berlalu: finished atau unfinished
+  const past = useMemo(
+    () =>
+      matches.filter((m) => m.state === "finished" || m.state === "unfinished"),
+    [matches],
+  );
+
+  // kelompokkan per lapangan (pakai courtLabel snapshot; fallback courtId)
+  const groups = useMemo(() => {
+    const map = new Map<string, Match[]>();
+    for (const m of past) {
+      const key = m.courtLabel ?? "Lapangan (dihapus)";
+      const arr = map.get(key) ?? [];
+      arr.push(m);
+      map.set(key, arr);
+    }
+    // urutkan match tiap lapangan by round
+    for (const arr of map.values()) {
+      arr.sort((a, b) => a.round - b.round || a.id.localeCompare(b.id));
+    }
+    return Array.from(map.entries());
+  }, [past]);
+
+  return (
+    <div className="flex flex-col gap-5">
+      <div>
+        <h2 className="text-lg font-bold">History Match</h2>
+        <p className="text-sm text-muted-foreground">
+          Semua match yang sudah berlalu per lapangan. Tap ikon pensil untuk
+          edit skor.
+        </p>
+      </div>
+
+      {groups.length === 0 ? (
+        <p className="py-8 text-center text-sm text-muted-foreground">
+          Belum ada match yang selesai.
+        </p>
+      ) : (
+        groups.map(([label, list]) => (
+          <div key={label}>
+            <div className="mb-2 text-sm font-medium">{label}</div>
+            <div className="flex flex-col gap-2">
+              {list.map((m, idx) => (
+                <MatchHistoryRow
+                  key={m.id}
+                  match={m}
+                  matchNumber={idx + 1}
+                  byId={byId}
+                  onEdit={() => {
+                    haptic(10);
+                    setEditFor(m);
+                  }}
+                />
+              ))}
+            </div>
+          </div>
+        ))
+      )}
+
+      {editFor && (
+        <EditScoreDialog
+          match={editFor}
+          byId={byId}
+          onClose={() => setEditFor(null)}
+        />
+      )}
+    </div>
+  );
+}
+
+function MatchHistoryRow({
+  match,
+  matchNumber,
+  byId,
+  onEdit,
+}: {
+  match: Match;
+  matchNumber: number;
+  byId: Map<string, SessionPlayer>;
+  onEdit: () => void;
+}) {
+  const name = (id: string) => byId.get(id)?.name ?? "?";
+  const level = (id: string) => byId.get(id)?.level ?? null;
+  const unfinished = match.state === "unfinished";
+  const aWon = match.winner === "a";
+  const bWon = match.winner === "b";
+
+  return (
+    <div className="rounded-xl border border-border bg-card p-3">
+      <div className="mb-2 flex items-center justify-between">
+        <span className="flex items-center gap-1.5 text-xs font-medium">
+          <span className="rounded-md bg-primary/10 px-2 py-0.5 text-primary">
+            Match ke-{matchNumber}
+          </span>
+          {unfinished && (
+            <span className="rounded-md bg-destructive/10 px-2 py-0.5 text-destructive">
+              tidak selesai
+            </span>
+          )}
+        </span>
+        {!unfinished && (
+          <button
+            onClick={onEdit}
+            className="flex h-8 w-8 items-center justify-center rounded-lg text-muted-foreground active:scale-90 active:bg-secondary"
+            aria-label="Edit skor"
+          >
+            <Pencil size={15} />
+          </button>
+        )}
+      </div>
+
+      <div className="flex items-center gap-2">
+        <div className="flex min-w-0 flex-1 flex-col gap-2">
+          {match.teamA.playerIds.map((id) => (
+            <div key={id} className="flex flex-col gap-0.5">
+              <span className={cn("truncate text-sm", aWon && "font-semibold")}>
+                {name(id)}
+              </span>
+              <LevelBadge level={level(id)} className="w-fit shrink-0" />
+            </div>
+          ))}
+        </div>
+
+        <div className="shrink-0 px-1 text-center">
+          {unfinished ? (
+            <span className="text-xs text-muted-foreground">—</span>
+          ) : (
+            <div className="flex items-center gap-1 font-bold">
+              <span className={cn(aWon && "text-primary")}>
+                {match.score?.a}
+              </span>
+              <span className="text-muted-foreground">-</span>
+              <span className={cn(bWon && "text-primary")}>
+                {match.score?.b}
+              </span>
+            </div>
+          )}
+        </div>
+
+        <div className="flex min-w-0 flex-1 flex-col items-end gap-2">
+          {match.teamB.playerIds.map((id) => (
+            <div key={id} className="flex flex-col items-end gap-0.5">
+              <span className={cn("truncate text-sm", bWon && "font-semibold")}>
+                {name(id)}
+              </span>
+              <LevelBadge level={level(id)} className="w-fit shrink-0" />
+            </div>
+          ))}
+        </div>
+      </div>
+    </div>
+  );
+}

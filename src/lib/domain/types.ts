@@ -1,0 +1,116 @@
+// ============================================================================
+// Tipe data inti TangkasBoard
+// ============================================================================
+
+/** Level pemain — ditentukan manual oleh host (tidak ada promosi otomatis). */
+export type Level = "newbie" | "beginner" | "intermediate" | "advanced";
+
+/** Status pemain dalam satu sesi mabar. */
+export type PlayerStatus =
+  | "registered" // sudah didaftarkan, belum tentu datang
+  | "active" // sudah check-in & siap main
+  | "resting" // istirahat sementara, belum pulang
+  | "left"; // pulang / batal (keluar permanen)
+
+/**
+ * Profil pemain (lapisan roster — persisten lintas mabar).
+ * `level` bisa null bila belum di-observe.
+ */
+export interface PlayerProfile {
+  id: string;
+  name: string;
+  level: Level | null;
+}
+
+/**
+ * State pemain dalam satu sesi mabar (lapisan session — sementara).
+ * Menggabungkan profil + data runtime yang dipakai matchmaking.
+ */
+export interface SessionPlayer {
+  id: string;
+  name: string;
+  level: Level | null;
+  status: PlayerStatus;
+  /** Waktu pertama kali check-in (ISO) — untuk sort urutan kedatangan. */
+  checkedInAt?: string | null;
+  /** Berapa kali pemain sudah menyelesaikan match di sesi ini. */
+  gamesPlayed: number;
+  /**
+   * Nomor ronde global terakhir saat pemain menyelesaikan match.
+   * Dipakai untuk penalti "baru selesai main" dan urutan menunggu.
+   * null = belum pernah main.
+   */
+  lastPlayedRound: number | null;
+  /**
+   * Nomor ronde global saat pemain terakhir tersedia untuk antrian
+   * (mis. saat check-in atau saat balik dari resting). Dipakai untuk
+   * tie-break "paling lama menunggu".
+   */
+  availableSinceRound: number;
+  /** Akumulasi statistik pertandingan. */
+  wins: number;
+  losses: number;
+  draws: number;
+  pointsScored: number;
+  pointsConceded: number;
+}
+
+/** Satu tim (pasangan ganda). */
+export interface Team {
+  playerIds: [string, string];
+}
+
+/** Satu pertandingan di sebuah lapangan. */
+export interface Match {
+  id: string;
+  courtId: string;
+  /** Snapshot nama lapangan (untuk History; tetap ada walau court dihapus). */
+  courtLabel?: string | null;
+  round: number;
+  teamA: Team;
+  teamB: Team;
+  /** Status match. */
+  state: "proposed" | "playing" | "finished" | "unfinished";
+  /** Skor akhir (null bila belum di-Finish). */
+  score: { a: number; b: number } | null;
+  /** Pemenang: "a" | "b" | "draw" | null (belum selesai). */
+  winner: "a" | "b" | "draw" | null;
+}
+
+/** Konfigurasi bobot & penalti untuk matchmaking (mudah di-tune). */
+export interface MatchmakingConfig {
+  /** Bobot penalti ketidakseimbangan level antar tim. */
+  balanceWeight: number;
+  /** Bobot penalti pengulangan partner (setim). */
+  repeatPartnerWeight: number;
+  /** Bobot penalti pengulangan lawan. */
+  repeatOpponentWeight: number;
+  /** Penalti bila memilih pemain yang baru selesai main di ronde sebelumnya. */
+  justPlayedPenalty: number;
+  /** Jumlah kandidat kombinasi yang dicoba per pembentukan match. */
+  candidateSamples: number;
+}
+
+export const DEFAULT_CONFIG: MatchmakingConfig = {
+  balanceWeight: 10,
+  repeatPartnerWeight: 6,
+  repeatOpponentWeight: 3,
+  justPlayedPenalty: 8,
+  candidateSamples: 400,
+};
+
+/** Bobot numerik tiap level. */
+export const LEVEL_WEIGHT: Record<Level, number> = {
+  newbie: 1,
+  beginner: 2,
+  intermediate: 3,
+  advanced: 4,
+};
+
+/** Label tampilan tiap level. */
+export const LEVEL_LABEL: Record<Level, string> = {
+  newbie: "Newbie",
+  beginner: "Beginner",
+  intermediate: "Intermediate",
+  advanced: "Advanced",
+};
