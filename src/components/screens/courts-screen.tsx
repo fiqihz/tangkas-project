@@ -2,7 +2,7 @@
 
 import { useMemo, useState } from "react";
 import { motion } from "framer-motion";
-import { Plus, Trash2, Pencil, Info, Play, Search } from "lucide-react";
+import { Plus, Trash2, Pencil, Info, Play, Search, Wand2 } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent } from "@/components/ui/card";
 import { Input } from "@/components/ui/input";
@@ -28,7 +28,9 @@ export function CourtsScreen() {
     proposedMatchByCourt,
     courtMatchNumber,
     startMatch,
+    generateLockedPreview,
   } = useSessionStore();
+  const [autoFillMsg, setAutoFillMsg] = useState<string | null>(null);
 
   const [finishFor, setFinishFor] = useState<Match | null>(null);
   const [manualFor, setManualFor] = useState<string | null>(null);
@@ -80,6 +82,12 @@ export function CourtsScreen() {
             ikut rekomendasi otomatis. Set level mereka di tab Pemain, atau isi
             manual.
           </span>
+        </div>
+      )}
+
+      {autoFillMsg && (
+        <div className="rounded-xl bg-amber-100 px-3 py-2.5 text-sm text-amber-900 dark:bg-amber-900/40 dark:text-amber-100">
+          {autoFillMsg}
         </div>
       )}
 
@@ -136,6 +144,14 @@ export function CourtsScreen() {
                       match={primary}
                       matchNumber={courtMatchNumber(court.id, primary.id)}
                       byId={byId}
+                      hasPreview={!!lockedPreview}
+                      onAutoFill={async () => {
+                        haptic(12);
+                        const res = await generateLockedPreview(court.id);
+                        if (!res.ok)
+                          setAutoFillMsg(res.reason ?? "Gagal menyusun preview.");
+                        else setAutoFillMsg(null);
+                      }}
                       onFinish={() => {
                         haptic(12);
                         setFinishFor(primary);
@@ -276,6 +292,8 @@ function MatchView({
   match,
   matchNumber,
   byId,
+  hasPreview,
+  onAutoFill,
   onFinish,
   onStart,
   onTapPlayer,
@@ -283,6 +301,8 @@ function MatchView({
   match: Match;
   matchNumber: number;
   byId: Map<string, SessionPlayer>;
+  hasPreview: boolean;
+  onAutoFill: () => void;
   onFinish: () => void;
   onStart: () => void;
   onTapPlayer: (playerId: string) => void;
@@ -324,9 +344,19 @@ function MatchView({
           <Play size={16} /> Mulai Main
         </Button>
       ) : (
-        <Button variant="warning" onClick={onFinish}>
-          Finish &amp; Input Skor
-        </Button>
+        <div className="flex gap-2">
+          <Button
+            variant="info"
+            className="flex-1"
+            onClick={onAutoFill}
+            disabled={hasPreview}
+          >
+            <Wand2 size={16} /> Auto-fill
+          </Button>
+          <Button variant="warning" className="flex-1" onClick={onFinish}>
+            Finish &amp; Skor
+          </Button>
+        </div>
       )}
     </div>
   );

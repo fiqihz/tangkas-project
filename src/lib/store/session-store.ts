@@ -445,15 +445,11 @@ export const useSessionStore = create<SessionState>((set, get) => ({
   },
 
   async startMatch(matchId) {
-    const { matches } = get();
-    const match = matches.find((m) => m.id === matchId);
+    // Preview TIDAK di-generate otomatis di sini. Host menekan tombol
+    // "Auto-fill" per lapangan untuk menyusun preview — supaya rotasi bisa
+    // mencampur pemain lintas lapangan (pool menunggu lebih penuh).
     await repo.updateMatchState(matchId, "playing");
     await get().refresh();
-    // Opsi X: begitu match dimulai, langsung siapkan (lock) preview 4 pemain
-    // berikutnya di lapangan ini sebagai match 'proposed' yang dipersist.
-    if (match?.courtId) {
-      await get().generateLockedPreview(match.courtId);
-    }
   },
 
   playingMatchByCourt(courtId) {
@@ -544,17 +540,10 @@ export const useSessionStore = create<SessionState>((set, get) => ({
       }),
     );
 
+    // Preview yang sudah di-lock (proposed) di lapangan ini otomatis "naik"
+    // jadi match berikutnya. Preview baru TIDAK di-generate otomatis — host
+    // menekan tombol "Auto-fill" per lapangan untuk menyusunnya.
     await get().refresh();
-
-    // Preview yang sudah di-lock (proposed) di lapangan ini TIDAK di-generate
-    // ulang — biarkan tetap (nama tidak geser). Bila belum ada proposed sama
-    // sekali (mis. dulu pemain kurang), coba buat sekarang.
-    const stillProposed = get().matches.some(
-      (m) => m.courtId === match.courtId && m.state === "proposed",
-    );
-    if (!stillProposed && match.courtId) {
-      await get().generateLockedPreview(match.courtId);
-    }
   },
 
   async editProposedPlayer(matchId, outId, inId) {

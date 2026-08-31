@@ -84,10 +84,11 @@ Status match: **proposed** (belum mulai) → **playing** (berjalan) → **finish
 
 - **Match pertama tiap lapangan**: host **Isi manual** (first come first play). Tidak ada tombol auto-fill.
 - Alur: isi manual → match **proposed** → tap **Mulai Main** → **playing**.
-- **Preview terkunci (Opsi X)**: begitu match **Mulai Main**, sistem langsung membuat & **mem-persist** match `proposed` berikutnya di lapangan itu (4 pemain terkunci, tidak geser). Preview antar lapangan **saling eksklusif** (tidak ada nama dobel).
+- **Preview terkunci via tombol Auto-fill (manual)**: preview **tidak** di-generate otomatis saat Mulai Main/Finish. Host menekan tombol **Auto-fill** (per lapangan) untuk menyusun preview `proposed` berikutnya. Ini disengaja: dengan menyusun setelah semua lapangan ongoing, pool pemain menunggu lebih penuh → rotasi bisa mencampur pemain lintas lapangan (bukan itu-itu saja). Preview yang sudah disusun **terkunci** (tidak geser) dan **saling eksklusif** antar lapangan.
+- **Tombol per lapangan (saat playing)**: **Auto-fill** (kiri, biru — disabled bila preview sudah ada) + **Finish & Skor** (kanan, oranye).
 - **Edit preview**: tap pemain di preview terkunci → ganti dengan pemain Active yang menunggu. Bila pengganti ada di preview lapangan lain → otomatis di-swap (tetap eksklusif).
 - **Warning preview**: bila pemain di preview sudah `resting`/`left`, muncul peringatan agar diganti sebelum match mulai.
-- **Finish & Input Skor** (hanya saat playing) → skor tercatat. Preview `proposed` yang sudah terkunci **tidak di-generate ulang** (nama tetap). Bila belum ada preview (mis. pemain kurang saat start), dibuat saat Finish.
+- **Finish & Input Skor** (hanya saat playing) → skor tercatat. Preview `proposed` yang sudah terkunci otomatis "naik" jadi match berikutnya. Preview baru **tidak** dibuat otomatis — host menekan Auto-fill lagi.
 - Tiap lapangan berjalan independen; **"Match ke-N" dihitung per lapangan**.
 - Warna tombol: **Mulai Main** = biru (info), **Finish** = oranye (warning).
 
