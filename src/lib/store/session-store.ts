@@ -577,6 +577,24 @@ export const useSessionStore = create<SessionState>((set, get) => ({
     const sw = (t: [string, string], from: string, to: string): [string, string] =>
       t.map((id) => (id === from ? to : id)) as [string, string];
 
+    if (otherProposed) {
+      // Validasi hard rule di sisi preview LAIN: outId gabung ke sana,
+      // partner-nya tidak boleh sama-sama Newbie.
+      const rInA = otherProposed.teamA.playerIds.includes(inId);
+      const rTeam = rInA
+        ? otherProposed.teamA.playerIds
+        : otherProposed.teamB.playerIds;
+      const rPartnerId = rTeam.find((id) => id !== inId);
+      const rPartner = rPartnerId ? byId.get(rPartnerId) : undefined;
+      const out = byId.get(outId);
+      if (rPartner?.level === "newbie" && out?.level === "newbie") {
+        return {
+          ok: false,
+          reason: "Swap ditolak: menghasilkan Newbie+Newbie di preview lain.",
+        };
+      }
+    }
+
     const newA = sw(match.teamA.playerIds, outId, inId);
     const newB = sw(match.teamB.playerIds, outId, inId);
     await repo.updateMatchTeams(matchId, newA, newB);

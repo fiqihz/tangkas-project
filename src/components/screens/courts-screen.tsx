@@ -447,24 +447,71 @@ function EditPreviewDialog({
   playerId: string;
   onClose: () => void;
 }) {
-  const { players, editProposedPlayer, busyPlayerIds } = useSessionStore();
+  const { players, matches, editProposedPlayer } = useSessionStore();
   const [query, setQuery] = useState("");
   const [msg, setMsg] = useState<string | null>(null);
   const [working, setWorking] = useState(false);
 
   const outPlayer = players.find((p) => p.id === playerId);
-  const busy = busyPlayerIds();
-  // Kandidat: Active menunggu (tidak sedang main / di preview) + ber-level.
-  const candidates = useMemo(() => {
-    const q = query.trim().toLowerCase();
-    return players.filter(
-      (p) =>
-        p.status === "active" &&
-        !busy.has(p.id) &&
-        p.level !== null &&
-        (!q || p.name.toLowerCase().includes(q)),
-    );
-  }, [players, busy, query]);
+
+  // Pemain yang sedang di preview (proposed) lain — untuk swap antar preview.
+  const inOtherPreview = useMemo(() => {
+    const ids = new Set<string>();
+    for (const m of matches) {
+      if (m.state === "proposed" && m.id !== match.id) {
+        [...m.teamA.playerIds, ...m.teamB.playerIds].forEach((id) =>
+          ids.add(id),
+        );
+      }
+    }
+    return ids;
+  }, [matches, match.id]);
+
+  // Pemain yang sedang playing (di lapangan) — tidak bisa dipilih untuk preview.
+  const playingIds = useMemo(() => {
+    const ids = new Set<string>();
+    for (const m of matches) {
+      if (m.state === "playing") {
+        [...m.teamA.playerIds, ...m.teamB.playerIds].forEach((id) =>
+          ids.add(id),
+        );
+      }
+    }
+    return ids;
+  }, [matches]);
+
+  const q = query.trim().toLowerCase();
+  const matchIds = new Set([
+    ...match.teamA.playerIds,
+    ...match.teamB.playerIds,
+  ]);
+
+  // Kelompok 1: pemain Active menunggu (bebas, tidak di preview/playing manapun).
+  const waiting = useMemo(
+    () =>
+      players.filter(
+        (p) =>
+          p.status === "active" &&
+          p.level !== null &&
+          !playingIds.has(p.id) &&
+          !inOtherPreview.has(p.id) &&
+          !matchIds.has(p.id) &&
+          (!q || p.name.toLowerCase().includes(q)),
+      ),
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+    [players, playingIds, inOtherPreview, q],
+  );
+
+  // Kelompok 2: pemain di preview lapangan lain (swap antar preview).
+  const swapCandidates = useMemo(
+    () =>
+      players.filter(
+        (p) =>
+          inOtherPreview.has(p.id) &&
+          (!q || p.name.toLowerCase().includes(q)),
+      ),
+    [players, inOtherPreview, q],
+  );
 
   const pick = async (inId: string) => {
     haptic(15);
@@ -475,6 +522,33 @@ function EditPreviewDialog({
     onClose();
   };
 
+  const Row = ({
+    p,
+    swap,
+  }: {
+    p: SessionPlayer;
+    swap?: boolean;
+  }) => (
+    <button
+      onClick={() => pick(p.id)}
+      disabled={working}
+      className="flex min-h-[48px] select-none items-center justify-between gap-2 rounded-xl border border-border bg-card px-3 py-2 text-left text-sm transition-all active:scale-[0.98] active:bg-secondary"
+    >
+      <span className="flex min-w-0 items-center gap-2">
+        <span className="truncate font-medium">{p.name}</span>
+        <LevelBadge level={p.level} className="shrink-0" />
+      </span>
+      <span className="flex shrink-0 items-center gap-1.5 text-xs text-muted-foreground">
+        {swap && (
+          <span className="rounded bg-sky-500/15 px-1.5 py-0.5 font-medium text-sky-600">
+            preview lain
+          </span>
+        )}
+        {p.gamesPlayed}x
+      </span>
+    </button>
+  );
+
   return (
     <Sheet open onOpenChange={(o) => !o && onClose()}>
       <SheetContent>
@@ -482,7 +556,8 @@ function EditPreviewDialog({
           Ganti {outPlayer?.name}
         </SheetTitle>
         <p className="mt-1 text-sm text-muted-foreground">
-          Pilih pemain pengganti dari yang sedang menunggu.
+          Pilih dari pemain menunggu, atau tukar dengan pemain di preview
+          lapangan lain.
         </p>
         {msg && <p className="mt-2 text-sm text-destructive">{msg}</p>}
 
@@ -499,28 +574,34 @@ function EditPreviewDialog({
           />
         </div>
 
-        <div className="flex max-h-[45vh] flex-col gap-1.5 overflow-y-auto">
-          {candidates.length === 0 && (
-            <p className="py-4 text-center text-sm text-muted-foreground">
-              Tidak ada pemain menunggu yang tersedia.
-            </p>
+        <div className="flex max-h-[45vh] flex-col gap-3 overflow-y-auto">
+          <div>
+            <div className="mb-1.5 text-xs font-semibold text-muted-foreground">
+              Menunggu
+            </div>
+            <div className="flex flex-col gap-1.5">
+              {waiting.length === 0 ? (
+                <p className="py-2 text-center text-xs text-muted-foreground">
+                  Tidak ada pemain menunggu.
+                </p>
+              ) : (
+                waiting.map((p) => <Row key={p.id} p={p} />)
+              )}
+            </div>
+          </div>
+
+          {swapCandidates.length > 0 && (
+            <div>
+              <div className="mb-1.5 text-xs font-semibold text-muted-foreground">
+                Tukar dengan preview lapangan lain
+              </div>
+              <div className="flex flex-col gap-1.5">
+                {swapCandidates.map((p) => (
+                  <Row key={p.id} p={p} swap />
+                ))}
+              </div>
+            </div>
           )}
-          {candidates.map((c) => (
-            <button
-              key={c.id}
-              onClick={() => pick(c.id)}
-              disabled={working}
-              className="flex min-h-[48px] select-none items-center justify-between gap-2 rounded-xl border border-border bg-card px-3 py-2 text-left text-sm transition-all active:scale-[0.98] active:bg-secondary"
-            >
-              <span className="flex min-w-0 items-center gap-2">
-                <span className="truncate font-medium">{c.name}</span>
-                <LevelBadge level={c.level} className="shrink-0" />
-              </span>
-              <span className="shrink-0 text-xs text-muted-foreground">
-                {c.gamesPlayed}x
-              </span>
-            </button>
-          ))}
         </div>
 
         <Button className="mt-4 w-full" variant="ghost" onClick={onClose}>
