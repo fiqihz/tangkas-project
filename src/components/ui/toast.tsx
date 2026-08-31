@@ -12,7 +12,7 @@ import { X } from "lucide-react";
 export function Toast({
   message,
   onClose,
-  duration = 4500,
+  duration = 5000,
   variant = "warning",
 }: {
   message: string | null;
