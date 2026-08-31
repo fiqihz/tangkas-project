@@ -81,6 +81,10 @@ interface SessionState {
     outId: string,
     inId: string,
   ) => Promise<{ ok: boolean; reason?: string }>;
+  restProposedPlayer: (
+    matchId: string,
+    playerId: string,
+  ) => Promise<{ ok: boolean; reason?: string }>;
   finishMatch: (
     matchId: string,
     scoreA: number,
@@ -544,6 +548,62 @@ export const useSessionStore = create<SessionState>((set, get) => ({
     // jadi match berikutnya. Preview baru TIDAK di-generate otomatis — host
     // menekan tombol "Auto-fill" per lapangan untuk menyusunnya.
     await get().refresh();
+  },
+
+  async restProposedPlayer(matchId, playerId) {
+    // Pemain di preview (proposed) mau istirahat: keluar -> resting, slot diisi
+    // pengganti otomatis dari pool menunggu (patuh hard rule).
+    const { matches, players } = get();
+    const match = matches.find((m) => m.id === matchId);
+    if (!match || match.state !== "proposed") {
+      return { ok: false, reason: "Hanya berlaku untuk preview." };
+    }
+
+    const history = MatchHistory.fromMatches(matches);
+    const busy = get().busyPlayerIds();
+    const pool = availablePool(players, {
+      requireLevel: true,
+      excludeIds: new Set([
+        ...busy,
+        ...match.teamA.playerIds,
+        ...match.teamB.playerIds,
+      ]),
+    });
+
+    const sub = findSubstitute({
+      match: { teamA: match.teamA.playerIds, teamB: match.teamB.playerIds },
+      leavingId: playerId,
+      pool,
+      byId: byIdMap(players),
+      history,
+      currentRound: match.round,
+    });
+
+    // pemain preview -> resting
+    await repo.updateSessionPlayer(playerId, { status: "resting" });
+
+    if (!sub) {
+      // tidak ada pengganti: keluarkan saja (slot jadi kosong tidak didukung
+      // pada 2v2). Kembalikan info agar UI bisa menampilkan pesan.
+      await get().refresh();
+      return {
+        ok: false,
+        reason:
+          "Tidak ada pengganti tersedia. Pemain diistirahatkan; ganti manual.",
+      };
+    }
+
+    const sw = (t: [string, string]): [string, string] =>
+      t.map((id) => (id === playerId ? sub : id)) as [string, string];
+    const newA = match.teamA.playerIds.includes(playerId)
+      ? sw(match.teamA.playerIds)
+      : match.teamA.playerIds;
+    const newB = match.teamB.playerIds.includes(playerId)
+      ? sw(match.teamB.playerIds)
+      : match.teamB.playerIds;
+    await repo.updateMatchTeams(matchId, newA, newB);
+    await get().refresh();
+    return { ok: true };
   },
 
   async editProposedPlayer(matchId, outId, inId) {

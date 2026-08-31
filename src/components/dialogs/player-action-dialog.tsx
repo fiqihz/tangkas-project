@@ -17,9 +17,16 @@ import { cn } from "@/lib/utils";
 type Intent = "rest" | "correct";
 type View = "menu" | "pick";
 
+/** Ringkasan M:x K:x untuk seorang pemain. */
+function statLabel(p: SessionPlayer) {
+  return `M:${p.wins} K:${p.losses}`;
+}
+
 /**
- * Aksi pemain di dalam match yang sedang keluar di lapangan (belum di-Finish).
- * Dibuka dengan men-tap baris pemain. Butuh konfirmasi eksplisit.
+ * Aksi pemain di kartu lapangan. Mendukung 2 konteks:
+ *  - match 'playing'  → Istirahatkan/Ganti pemain yang sedang main.
+ *  - match 'proposed' → aksi pada pemain di preview terkunci.
+ * Dibuka dengan men-tap pemain. Butuh konfirmasi eksplisit.
  */
 export function PlayerActionDialog({
   match,
@@ -34,8 +41,14 @@ export function PlayerActionDialog({
     substituteInProposed,
     manualSubstitute,
     substituteCandidates,
+    restProposedPlayer,
+    editProposedPlayer,
+    players,
+    matches,
     setPlayerLevel,
   } = useSessionStore();
+
+  const isPreview = match.state === "proposed";
 
   const [view, setView] = useState<View>("menu");
   const [intent, setIntent] = useState<Intent>("rest");
@@ -45,27 +58,57 @@ export function PlayerActionDialog({
 
   const leavingStatus: PlayerStatus = intent === "rest" ? "resting" : "active";
 
+  // Kandidat untuk mode PLAYING (pakai substituteCandidates existing).
   const { preferred, others, playing, sameMatch } = useMemo(
     () => substituteCandidates(match.id, player.id),
     [substituteCandidates, match.id, player.id],
   );
 
-  const filteredOthers = useMemo(() => {
-    const q = query.trim().toLowerCase();
-    if (!q) return others;
-    return others.filter((p) => p.name.toLowerCase().includes(q));
-  }, [others, query]);
+  // Kandidat untuk mode PREVIEW: pemain menunggu + pemain di preview lain (swap).
+  const previewCandidates = useMemo(() => {
+    if (!isPreview) return { waiting: [], otherPreview: [] };
+    const playingIds = new Set<string>();
+    const otherPreviewIds = new Set<string>();
+    for (const m of matches) {
+      if (m.state === "playing") {
+        [...m.teamA.playerIds, ...m.teamB.playerIds].forEach((id) =>
+          playingIds.add(id),
+        );
+      } else if (m.state === "proposed" && m.id !== match.id) {
+        [...m.teamA.playerIds, ...m.teamB.playerIds].forEach((id) =>
+          otherPreviewIds.add(id),
+        );
+      }
+    }
+    const inThis = new Set([
+      ...match.teamA.playerIds,
+      ...match.teamB.playerIds,
+    ]);
+    const waiting = players.filter(
+      (p) =>
+        p.status === "active" &&
+        p.level !== null &&
+        !playingIds.has(p.id) &&
+        !otherPreviewIds.has(p.id) &&
+        !inThis.has(p.id),
+    );
+    const otherPreview = players.filter((p) => otherPreviewIds.has(p.id));
+    return { waiting, otherPreview };
+  }, [isPreview, matches, players, match.id, match.teamA, match.teamB]);
 
-  const filteredPlaying = useMemo(() => {
+  const applyQuery = (list: SessionPlayer[]) => {
     const q = query.trim().toLowerCase();
-    if (!q) return playing;
-    return playing.filter((p) => p.name.toLowerCase().includes(q));
-  }, [playing, query]);
+    if (!q) return list;
+    return list.filter((p) => p.name.toLowerCase().includes(q));
+  };
 
+  // ---- Aksi ----
   const restAuto = async () => {
     haptic(15);
     setWorking(true);
-    const res = await substituteInProposed(match.id, player.id, "resting");
+    const res = isPreview
+      ? await restProposedPlayer(match.id, player.id)
+      : await substituteInProposed(match.id, player.id, "resting");
     setWorking(false);
     if (!res.ok) return setMsg(res.reason ?? "Gagal.");
     onClose();
@@ -78,15 +121,17 @@ export function PlayerActionDialog({
     setView("pick");
   };
 
-  const doManual = async (replacementId: string) => {
+  const doPick = async (replacementId: string) => {
     haptic(15);
     setWorking(true);
-    const res = await manualSubstitute(
-      match.id,
-      player.id,
-      replacementId,
-      leavingStatus,
-    );
+    const res = isPreview
+      ? await editProposedPlayer(match.id, player.id, replacementId)
+      : await manualSubstitute(
+          match.id,
+          player.id,
+          replacementId,
+          leavingStatus,
+        );
     setWorking(false);
     if (!res.ok) return setMsg(res.reason ?? "Gagal.");
     onClose();
@@ -95,13 +140,17 @@ export function PlayerActionDialog({
   return (
     <Sheet open onOpenChange={(o) => !o && onClose()}>
       <SheetContent>
-        <SheetTitle className="flex items-center gap-2 text-lg font-bold">
-          {player.name} <LevelBadge level={player.level} />
+        <SheetTitle className="flex flex-wrap items-center gap-x-2 gap-y-1 text-lg font-bold">
+          <span className="flex items-center gap-2">
+            {player.name} <LevelBadge level={player.level} />
+          </span>
+          <span className="text-xs font-medium text-muted-foreground">
+            {statLabel(player)} · {player.gamesPlayed}x main
+          </span>
         </SheetTitle>
 
         {view === "menu" && (
           <>
-            {/* Set level — selalu tersedia (berguna untuk observasi) */}
             <div className="mt-3">
               <div className="mb-1 text-xs text-muted-foreground">
                 Set level {player.level === null && "(belum di-set)"}
@@ -149,12 +198,6 @@ export function PlayerActionDialog({
                 <X size={18} /> Batal
               </Button>
             </div>
-
-            <p className="mt-3 text-xs text-muted-foreground">
-              &quot;Ganti / tukar pemain&quot;: pemain ini kembali ke antrian
-              (tetap aktif). Bisa diganti pemain menunggu, atau ditukar dengan
-              pemain yang sedang main di lapangan lain.
-            </p>
           </>
         )}
 
@@ -163,101 +206,108 @@ export function PlayerActionDialog({
             <p className="mt-1 text-sm text-muted-foreground">
               {intent === "rest"
                 ? `Pilih pengganti — ${player.name} akan istirahat.`
-                : `Pilih pengganti — ${player.name} kembali ke antrian (aktif).`}
+                : `Pilih pengganti untuk ${player.name}.`}
             </p>
             {msg && <p className="mt-2 text-sm text-destructive">{msg}</p>}
 
-            {preferred.length > 0 && (
-              <div className="mt-3">
-                <div className="mb-1.5 text-xs font-semibold text-primary">
-                  ⭐ Disarankan
-                </div>
-                <div className="flex flex-col gap-1.5">
-                  {preferred.map((c) => (
-                    <CandidateRow
-                      key={c.id}
-                      player={c}
-                      onPick={() => doManual(c.id)}
-                      disabled={working}
-                      highlight
-                    />
-                  ))}
-                </div>
-              </div>
-            )}
-
-            <div className="mt-4">
-              <div className="mb-1.5 text-xs font-semibold text-muted-foreground">
-                Semua pemain tersedia
-              </div>
-              <div className="relative mb-2">
-                <Search
-                  size={16}
-                  className="absolute left-3 top-1/2 -translate-y-1/2 text-muted-foreground"
-                />
-                <Input
-                  placeholder="Cari nama…"
-                  value={query}
-                  onChange={(e) => setQuery(e.target.value)}
-                  className="pl-9"
-                />
-              </div>
-              <div className="flex max-h-[35vh] flex-col gap-1.5 overflow-y-auto">
-                {filteredOthers.length === 0 && (
-                  <p className="py-4 text-center text-sm text-muted-foreground">
-                    Tidak ada pemain tersedia lain.
-                  </p>
-                )}
-                {filteredOthers.map((c) => (
-                  <CandidateRow
-                    key={c.id}
-                    player={c}
-                    onPick={() => doManual(c.id)}
-                    disabled={working}
-                  />
-                ))}
-              </div>
+            <div className="relative mt-3 mb-2">
+              <Search
+                size={16}
+                className="absolute left-3 top-1/2 -translate-y-1/2 text-muted-foreground"
+              />
+              <Input
+                placeholder="Cari nama…"
+                value={query}
+                onChange={(e) => setQuery(e.target.value)}
+                className="pl-9"
+              />
             </div>
 
-            {/* Tukar di lapangan yang SAMA (tukar posisi/tim antar pemain di match ini) */}
-            {intent === "correct" && sameMatch.length > 0 && (
-              <div className="mt-4">
-                <div className="mb-1.5 text-xs font-semibold text-muted-foreground">
-                  Tukar posisi di lapangan ini
-                </div>
-                <div className="flex flex-col gap-1.5">
-                  {sameMatch.map((c) => (
-                    <CandidateRow
-                      key={c.id}
-                      player={c}
-                      onPick={() => doManual(c.id)}
-                      disabled={working}
-                      swap
-                    />
-                  ))}
-                </div>
-              </div>
-            )}
-
-            {/* Tukar dengan pemain yang sedang main di lapangan LAIN */}
-            {intent === "correct" && filteredPlaying.length > 0 && (
-              <div className="mt-4">
-                <div className="mb-1.5 text-xs font-semibold text-muted-foreground">
-                  Tukar dengan yang sedang main (lapangan lain)
-                </div>
-                <div className="flex max-h-[30vh] flex-col gap-1.5 overflow-y-auto">
-                  {filteredPlaying.map((c) => (
-                    <CandidateRow
-                      key={c.id}
-                      player={c}
-                      onPick={() => doManual(c.id)}
-                      disabled={working}
-                      swap
-                    />
-                  ))}
-                </div>
-              </div>
-            )}
+            <div className="flex max-h-[50vh] flex-col gap-3 overflow-y-auto">
+              {isPreview ? (
+                <>
+                  <Section title="Menunggu">
+                    {applyQuery(previewCandidates.waiting).map((c) => (
+                      <CandidateRow
+                        key={c.id}
+                        player={c}
+                        onPick={() => doPick(c.id)}
+                        disabled={working}
+                      />
+                    ))}
+                    {applyQuery(previewCandidates.waiting).length === 0 && (
+                      <EmptyRow />
+                    )}
+                  </Section>
+                  {applyQuery(previewCandidates.otherPreview).length > 0 && (
+                    <Section title="Tukar dengan preview lapangan lain">
+                      {applyQuery(previewCandidates.otherPreview).map((c) => (
+                        <CandidateRow
+                          key={c.id}
+                          player={c}
+                          onPick={() => doPick(c.id)}
+                          disabled={working}
+                          tag="preview lain"
+                        />
+                      ))}
+                    </Section>
+                  )}
+                </>
+              ) : (
+                <>
+                  {preferred.length > 0 && (
+                    <Section title="⭐ Disarankan">
+                      {preferred.map((c) => (
+                        <CandidateRow
+                          key={c.id}
+                          player={c}
+                          onPick={() => doPick(c.id)}
+                          disabled={working}
+                          highlight
+                        />
+                      ))}
+                    </Section>
+                  )}
+                  <Section title="Semua pemain tersedia">
+                    {applyQuery(others).map((c) => (
+                      <CandidateRow
+                        key={c.id}
+                        player={c}
+                        onPick={() => doPick(c.id)}
+                        disabled={working}
+                      />
+                    ))}
+                    {applyQuery(others).length === 0 && <EmptyRow />}
+                  </Section>
+                  {intent === "correct" && sameMatch.length > 0 && (
+                    <Section title="Tukar posisi di lapangan ini">
+                      {sameMatch.map((c) => (
+                        <CandidateRow
+                          key={c.id}
+                          player={c}
+                          onPick={() => doPick(c.id)}
+                          disabled={working}
+                          tag="lapangan ini"
+                        />
+                      ))}
+                    </Section>
+                  )}
+                  {intent === "correct" && applyQuery(playing).length > 0 && (
+                    <Section title="Tukar dengan yang sedang main (lapangan lain)">
+                      {applyQuery(playing).map((c) => (
+                        <CandidateRow
+                          key={c.id}
+                          player={c}
+                          onPick={() => doPick(c.id)}
+                          disabled={working}
+                          tag="main"
+                        />
+                      ))}
+                    </Section>
+                  )}
+                </>
+              )}
+            </div>
 
             <Button
               className="mt-4 w-full"
@@ -277,18 +327,43 @@ export function PlayerActionDialog({
   );
 }
 
+function Section({
+  title,
+  children,
+}: {
+  title: string;
+  children: React.ReactNode;
+}) {
+  return (
+    <div>
+      <div className="mb-1.5 text-xs font-semibold text-muted-foreground">
+        {title}
+      </div>
+      <div className="flex flex-col gap-1.5">{children}</div>
+    </div>
+  );
+}
+
+function EmptyRow() {
+  return (
+    <p className="py-2 text-center text-xs text-muted-foreground">
+      Tidak ada pemain.
+    </p>
+  );
+}
+
 function CandidateRow({
   player,
   onPick,
   disabled,
   highlight,
-  swap,
+  tag,
 }: {
   player: SessionPlayer;
   onPick: () => void;
   disabled?: boolean;
   highlight?: boolean;
-  swap?: boolean;
+  tag?: string;
 }) {
   return (
     <button
@@ -306,12 +381,12 @@ function CandidateRow({
         <LevelBadge level={player.level} className="shrink-0" />
       </span>
       <span className="flex shrink-0 items-center gap-1.5 text-xs text-muted-foreground">
-        {swap && (
-          <span className="rounded bg-amber-500/15 px-1.5 py-0.5 font-medium text-amber-600">
-            main
+        {tag && (
+          <span className="rounded bg-sky-500/15 px-1.5 py-0.5 font-medium text-sky-600">
+            {tag}
           </span>
         )}
-        {player.gamesPlayed}x
+        M:{player.wins} K:{player.losses} · {player.gamesPlayed}x
       </span>
     </button>
   );
