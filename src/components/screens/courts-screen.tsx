@@ -7,10 +7,18 @@ import { Button } from "@/components/ui/button";
 import { Card, CardContent } from "@/components/ui/card";
 import { Input } from "@/components/ui/input";
 import { LevelBadge } from "@/components/ui/level-badge";
+import { LevelSelect } from "@/components/ui/level-select";
+import { GenderBadge, GenderSelect } from "@/components/ui/gender-select";
 import { Fab } from "@/components/ui/fab";
 import { Sheet, SheetContent, SheetTitle } from "@/components/ui/sheet";
 import { Toast } from "@/components/ui/toast";
-import type { Match, MatchMode, SessionPlayer } from "@/lib/domain/types";
+import type {
+  Gender,
+  Level,
+  Match,
+  MatchMode,
+  SessionPlayer,
+} from "@/lib/domain/types";
 import { useSessionStore } from "@/lib/store/session-store";
 import { haptic } from "@/lib/haptics";
 import { cn } from "@/lib/utils";
@@ -30,10 +38,14 @@ export function CourtsScreen() {
     courtMatchNumber,
     startMatch,
     generateLockedPreview,
+    setPlayerLevel,
+    setPlayerGender,
   } = useSessionStore();
   const [autoFillMsg, setAutoFillMsg] = useState<string | null>(null);
   // Lapangan yang sedang memilih mode Auto-fill (null = sheet tertutup).
   const [modeForCourt, setModeForCourt] = useState<string | null>(null);
+  // Match yang butuh lengkapi level/gender dulu sebelum Finish (null = tak ada).
+  const [completeInfoFor, setCompleteInfoFor] = useState<Match | null>(null);
 
   const [finishFor, setFinishFor] = useState<Match | null>(null);
   const [manualFor, setManualFor] = useState<string | null>(null);
@@ -47,6 +59,20 @@ export function CourtsScreen() {
   } | null>(null);
 
   const byId = useMemo(() => new Map(players.map((p) => [p.id, p])), [players]);
+
+  // Match butuh dilengkapi bila ada pemain dengan level/gender belum di-set.
+  const matchNeedsInfo = (m: Match) =>
+    [...m.teamA.playerIds, ...m.teamB.playerIds].some((id) => {
+      const p = byId.get(id);
+      return !p || p.level === null || p.gender === null;
+    });
+
+  // Klik Finish: bila ada info kurang, buka gate dulu; kalau lengkap langsung Finish.
+  const handleFinish = (m: Match) => {
+    haptic(12);
+    if (matchNeedsInfo(m)) setCompleteInfoFor(m);
+    else setFinishFor(m);
+  };
 
   const activePlayers = players.filter((p) => p.status === "active");
   // "Main" = pemain di match yang sedang playing. Pemain di preview (proposed)
@@ -142,10 +168,7 @@ export function CourtsScreen() {
                         haptic(12);
                         setModeForCourt(court.id);
                       }}
-                      onFinish={() => {
-                        haptic(12);
-                        setFinishFor(primary);
-                      }}
+                      onFinish={() => handleFinish(primary)}
                       onStart={() => {
                         haptic(15);
                         startMatch(primary.id);
@@ -228,6 +251,20 @@ export function CourtsScreen() {
           }}
         />
       )}
+      {completeInfoFor && (
+        <CompleteInfoDialog
+          match={completeInfoFor}
+          byId={byId}
+          onSetLevel={setPlayerLevel}
+          onSetGender={setPlayerGender}
+          onClose={() => setCompleteInfoFor(null)}
+          onDone={() => {
+            const m = completeInfoFor;
+            setCompleteInfoFor(null);
+            setFinishFor(m);
+          }}
+        />
+      )}
 
       <Toast message={autoFillMsg} onClose={() => setAutoFillMsg(null)} />
     </div>
@@ -253,8 +290,11 @@ function TeamBlock({
       {ids.map((id) => {
         const content = (
           <span className="flex min-w-0 flex-1 flex-col gap-0.5 text-sm">
-            <span className="truncate font-medium">
-              {byId.get(id)?.name ?? "?"}
+            <span className="flex min-w-0 items-center gap-1">
+              <span className="truncate font-medium">
+                {byId.get(id)?.name ?? "?"}
+              </span>
+              <GenderBadge gender={byId.get(id)?.gender ?? null} />
             </span>
             <LevelBadge
               level={byId.get(id)?.level ?? null}
@@ -394,6 +434,7 @@ function LockedPreview({
       >
         <span className="flex items-center gap-1 truncate text-sm font-medium">
           {p?.name ?? "?"}
+          <GenderBadge gender={p?.gender ?? null} />
           {bad && <span className="shrink-0 text-xs text-destructive">⚠️</span>}
         </span>
         <LevelBadge level={p?.level ?? null} className="w-fit shrink-0" />
@@ -431,6 +472,118 @@ function LockedPreview({
   );
 }
 
+
+function CompleteInfoDialog({
+  match,
+  byId,
+  onSetLevel,
+  onSetGender,
+  onDone,
+  onClose,
+}: {
+  match: Match;
+  byId: Map<string, SessionPlayer>;
+  onSetLevel: (playerId: string, level: Level) => Promise<void>;
+  onSetGender: (playerId: string, gender: Gender) => Promise<void>;
+  onDone: () => void;
+  onClose: () => void;
+}) {
+  const ids = [...match.teamA.playerIds, ...match.teamB.playerIds];
+  const playersInMatch = ids
+    .map((id) => byId.get(id))
+    .filter((p): p is SessionPlayer => Boolean(p));
+  // Semua lengkap bila tak ada lagi yang level/gender-nya null.
+  const allComplete = playersInMatch.every(
+    (p) => p.level !== null && p.gender !== null,
+  );
+
+  return (
+    <Sheet open onOpenChange={(o) => !o && onClose()}>
+      <SheetContent>
+        <SheetTitle className="text-lg font-bold">
+          Lengkapi data pemain
+        </SheetTitle>
+        <p className="mt-1 text-sm text-muted-foreground">
+          Match ini sudah selesai — set <b>level</b> & <b>gender</b> pemain yang
+          belum terisi sebelum input skor. Data tersimpan ke roster.
+        </p>
+
+        <div className="mt-4 flex max-h-[55vh] flex-col gap-3 overflow-y-auto">
+          {playersInMatch.map((p) => {
+            const done = p.level !== null && p.gender !== null;
+            return (
+              <div
+                key={p.id}
+                className={cn(
+                  "rounded-xl border p-3",
+                  done
+                    ? "border-border bg-secondary/30"
+                    : "border-amber-300 bg-amber-50 dark:border-amber-900 dark:bg-amber-950/40",
+                )}
+              >
+                <div className="mb-2 flex items-center gap-2 font-medium">
+                  {p.name}
+                  <LevelBadge level={p.level} />
+                  <GenderBadge gender={p.gender} />
+                  {done && (
+                    <span className="ml-auto text-xs text-primary">✓ lengkap</span>
+                  )}
+                </div>
+                {p.level === null && (
+                  <div className="mb-2">
+                    <div className="mb-1 text-xs text-muted-foreground">
+                      Set level
+                    </div>
+                    <LevelSelect
+                      value={p.level}
+                      onChange={(lv) => {
+                        haptic(8);
+                        void onSetLevel(p.id, lv);
+                      }}
+                      size="sm"
+                    />
+                  </div>
+                )}
+                {p.gender === null && (
+                  <div>
+                    <div className="mb-1 text-xs text-muted-foreground">
+                      Set gender
+                    </div>
+                    <GenderSelect
+                      value={p.gender}
+                      onChange={(g) => {
+                        haptic(8);
+                        void onSetGender(p.id, g);
+                      }}
+                      size="sm"
+                    />
+                  </div>
+                )}
+              </div>
+            );
+          })}
+        </div>
+
+        <div className="mt-4 flex gap-2">
+          <Button variant="outline" className="flex-1" onClick={onClose}>
+            Batal
+          </Button>
+          <Button
+            variant="warning"
+            className="flex-1"
+            onClick={() => {
+              haptic(15);
+              onDone();
+            }}
+            disabled={!allComplete}
+          >
+            {allComplete ? "Lanjut ke Skor" : "Lengkapi dulu"}
+          </Button>
+        </div>
+      </SheetContent>
+    </Sheet>
+  );
+}
 
 const MODE_OPTIONS: {
   value: MatchMode;
