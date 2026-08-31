@@ -45,7 +45,12 @@ function scoreSplit(
 ): number | null {
   if (!isValidMatchup(a1, a2, b1, b2)) return null;
 
-  const imbalance = teamImbalance(a1, a2, b1, b2);
+  const rawImbalance = teamImbalance(a1, a2, b1, b2);
+  // Toleransi: selisih bobot <= tolerance dianggap "sama-sama seimbang"
+  // (efektif 0). Ini membuat mis. Advanced+Advanced vs Advanced+Beginner
+  // (selisih 2) tidak dihukum, sehingga Advanced bisa lawan sesama kelas —
+  // tidak selalu digendong. Selisih besar (>= 3) tetap dihindari.
+  const imbalance = Math.max(0, rawImbalance - cfg.imbalanceTolerance);
   let score = imbalance * cfg.balanceWeight;
 
   // penalti pengulangan partner

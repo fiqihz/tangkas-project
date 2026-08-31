@@ -83,10 +83,15 @@ Status match: **proposed** (belum mulai) → **playing** (berjalan) → **finish
 
 - **Match pertama tiap lapangan**: host **Isi manual** (first come first play). Tidak ada tombol auto-fill.
 - Alur: isi manual → match **proposed** → tap **Mulai Main** → **playing**.
-- Saat **playing**, di bawah kartu tampil **rekomendasi 4 pemain berikutnya** (computed, auto-recalculate, tidak dipersist). Bila pemain kurang/kombinasi tak valid → tampil pesan alasannya.
-- **Finish & Input Skor** (hanya saat playing) → skor tercatat → sistem **auto-generate match `proposed` berikutnya** di lapangan yang sama.
+- **Preview terkunci (Opsi X)**: begitu match **Mulai Main**, sistem langsung membuat & **mem-persist** match `proposed` berikutnya di lapangan itu (4 pemain terkunci, tidak geser). Preview antar lapangan **saling eksklusif** (tidak ada nama dobel).
+- **Edit preview**: tap pemain di preview terkunci → ganti dengan pemain Active yang menunggu. Bila pengganti ada di preview lapangan lain → otomatis di-swap (tetap eksklusif).
+- **Warning preview**: bila pemain di preview sudah `resting`/`left`, muncul peringatan agar diganti sebelum match mulai.
+- **Finish & Input Skor** (hanya saat playing) → skor tercatat. Preview `proposed` yang sudah terkunci **tidak di-generate ulang** (nama tetap). Bila belum ada preview (mis. pemain kurang saat start), dibuat saat Finish.
 - Tiap lapangan berjalan independen; **"Match ke-N" dihitung per lapangan**.
 - Warna tombol: **Mulai Main** = biru (info), **Finish** = oranye (warning).
+
+### Matchmaking — toleransi keseimbangan
+- Selisih bobot antar tim **≤2 dianggap seimbang** (tidak dihukum), agar level tinggi (mis. Advanced) bisa lawan sesama kelas, tidak selalu digendong. Selisih ≥3 tetap dihindari. Config: `imbalanceTolerance` di `DEFAULT_CONFIG`.
 
 ### Hapus lapangan saat ada match
 - Match **proposed** → dibatalkan (dihapus), pemain kembali `active`.

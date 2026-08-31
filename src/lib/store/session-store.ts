@@ -71,14 +71,15 @@ interface SessionState {
     teamB: [string, string],
   ) => Promise<void>;
   startMatch: (matchId: string) => Promise<void>;
-  previewNextFour: (
-    courtId: string,
-  ) =>
-    | { teamA: [string, string]; teamB: [string, string] }
-    | { reason: string }
-    | null;
-  autoGenerateProposed: (
+  playingMatchByCourt: (courtId: string) => Match | undefined;
+  proposedMatchByCourt: (courtId: string) => Match | undefined;
+  generateLockedPreview: (
     courtId: string | null,
+  ) => Promise<{ ok: boolean; reason?: string }>;
+  editProposedPlayer: (
+    matchId: string,
+    outId: string,
+    inId: string,
   ) => Promise<{ ok: boolean; reason?: string }>;
   finishMatch: (
     matchId: string,
@@ -444,42 +445,67 @@ export const useSessionStore = create<SessionState>((set, get) => ({
   },
 
   async startMatch(matchId) {
+    const { matches } = get();
+    const match = matches.find((m) => m.id === matchId);
     await repo.updateMatchState(matchId, "playing");
     await get().refresh();
+    // Opsi X: begitu match dimulai, langsung siapkan (lock) preview 4 pemain
+    // berikutnya di lapangan ini sebagai match 'proposed' yang dipersist.
+    if (match?.courtId) {
+      await get().generateLockedPreview(match.courtId);
+    }
   },
 
-  previewNextFour(courtId) {
-    // Rekomendasi 4 pemain berikutnya untuk sebuah lapangan yang sedang
-    // 'playing'. Bersifat computed (tidak dipersist) — hanya petunjuk visual.
-    const { session, matches, players } = get();
-    if (!session) return null;
+  playingMatchByCourt(courtId) {
+    return get()
+      .matches.filter((m) => m.courtId === courtId && m.state === "playing")
+      .at(-1);
+  },
 
-    // hanya relevan bila court sedang playing & belum ada proposed berikutnya
-    const inCourt = matches.filter(
-      (m) => m.courtId === courtId && (m.state === "proposed" || m.state === "playing"),
-    );
-    const hasProposed = inCourt.some((m) => m.state === "proposed");
-    const hasPlaying = inCourt.some((m) => m.state === "playing");
-    if (!hasPlaying || hasProposed) return null;
+  proposedMatchByCourt(courtId) {
+    return get()
+      .matches.filter((m) => m.courtId === courtId && m.state === "proposed")
+      .at(-1);
+  },
+
+  /**
+   * Buat & persist match 'proposed' (preview terkunci) di sebuah lapangan,
+   * saling eksklusif dengan proposed/playing lapangan lain. Tidak menimpa bila
+   * sudah ada proposed di lapangan itu.
+   */
+  async generateLockedPreview(courtId) {
+    const { session, matches, players, courts } = get();
+    if (!session || !courtId) return { ok: false };
+
+    // sudah ada proposed di lapangan ini -> jangan buat dobel
+    if (matches.some((m) => m.courtId === courtId && m.state === "proposed")) {
+      return { ok: false };
+    }
 
     const history = MatchHistory.fromMatches(matches);
+    // Eksklusif: kecualikan semua pemain yang sudah di proposed/playing mana pun.
     const busy = get().busyPlayerIds();
     const pool = availablePool(players, { requireLevel: true, excludeIds: busy });
+    if (pool.length < 4) return { ok: false, reason: "Pemain tersedia < 4." };
 
-    if (pool.length < 4) {
-      return {
-        reason: `Menunggu pemain cukup (butuh 4, tersedia ${pool.length}).`,
-      };
-    }
+    const round = session.current_round + 1;
+    const prop = generateMatch(pool, history, round);
+    if (!prop) return { ok: false, reason: "Tidak ada kombinasi valid." };
 
-    const prop = generateMatch(pool, history, session.current_round + 1);
-    if (!prop) {
-      return {
-        reason:
-          "Belum ada kombinasi valid dari pemain menunggu (cek aturan level Newbie).",
-      };
-    }
-    return { teamA: prop.teamA, teamB: prop.teamB };
+    const courtLabel = courts.find((c) => c.id === courtId)?.label ?? null;
+    await repo.createMatch({
+      sessionId: session.id,
+      courtId,
+      courtLabel,
+      round,
+      teamA: prop.teamA,
+      teamB: prop.teamB,
+      state: "proposed",
+    });
+    await repo.updateSession(session.id, { current_round: round });
+    set({ session: { ...session, current_round: round } });
+    await get().refresh();
+    return { ok: true };
   },
 
   async finishMatch(matchId, scoreA, scoreB, winner) {
@@ -518,46 +544,61 @@ export const useSessionStore = create<SessionState>((set, get) => ({
       }),
     );
 
-    // refresh dulu agar statistik pemain terbarui sebelum auto-generate
     await get().refresh();
 
-    // Auto-generate match 'proposed' berikutnya di lapangan yang sama
-    await get().autoGenerateProposed(match.courtId);
+    // Preview yang sudah di-lock (proposed) di lapangan ini TIDAK di-generate
+    // ulang — biarkan tetap (nama tidak geser). Bila belum ada proposed sama
+    // sekali (mis. dulu pemain kurang), coba buat sekarang.
+    const stillProposed = get().matches.some(
+      (m) => m.courtId === match.courtId && m.state === "proposed",
+    );
+    if (!stillProposed && match.courtId) {
+      await get().generateLockedPreview(match.courtId);
+    }
   },
 
-  async autoGenerateProposed(courtId) {
-    const { session, matches, players, courts } = get();
-    if (!session || !courtId) return { ok: false };
+  async editProposedPlayer(matchId, outId, inId) {
+    const { matches, players } = get();
+    const match = matches.find((m) => m.id === matchId);
+    if (!match || match.state !== "proposed") {
+      return { ok: false, reason: "Hanya match preview yang bisa diedit." };
+    }
+    const byId = byIdMap(players);
+    const replacement = byId.get(inId);
+    if (!replacement) return { ok: false, reason: "Pemain tidak ditemukan." };
 
-    // jangan generate kalau court sudah punya match proposed/playing
-    const active = matches.some(
+    // Tentukan partner dari pemain yang keluar (untuk validasi hard rule).
+    const inA = match.teamA.playerIds.includes(outId);
+    const team = inA ? match.teamA.playerIds : match.teamB.playerIds;
+    const partnerId = team.find((id) => id !== outId);
+    const partner = partnerId ? byId.get(partnerId) : undefined;
+    if (partner?.level === "newbie" && replacement.level === "newbie") {
+      return { ok: false, reason: "Newbie tidak boleh setim dengan Newbie." };
+    }
+
+    // Jika pengganti sedang berada di proposed lapangan LAIN -> tukar (swap)
+    // agar tetap eksklusif (tidak ada nama dobel antar preview).
+    const otherProposed = matches.find(
       (m) =>
-        m.courtId === courtId &&
-        (m.state === "proposed" || m.state === "playing"),
+        m.id !== matchId &&
+        m.state === "proposed" &&
+        [...m.teamA.playerIds, ...m.teamB.playerIds].includes(inId),
     );
-    if (active) return { ok: false };
 
-    const history = MatchHistory.fromMatches(matches);
-    const busy = get().busyPlayerIds();
-    const pool = availablePool(players, { requireLevel: true, excludeIds: busy });
-    if (pool.length < 4) return { ok: false, reason: "Pemain tersedia < 4." };
+    const sw = (t: [string, string], from: string, to: string): [string, string] =>
+      t.map((id) => (id === from ? to : id)) as [string, string];
 
-    const round = session.current_round + 1;
-    const prop = generateMatch(pool, history, round);
-    if (!prop) return { ok: false, reason: "Tidak ada kombinasi valid." };
+    const newA = sw(match.teamA.playerIds, outId, inId);
+    const newB = sw(match.teamB.playerIds, outId, inId);
+    await repo.updateMatchTeams(matchId, newA, newB);
 
-    const courtLabel = courts.find((c) => c.id === courtId)?.label ?? null;
-    await repo.createMatch({
-      sessionId: session.id,
-      courtId,
-      courtLabel,
-      round,
-      teamA: prop.teamA,
-      teamB: prop.teamB,
-      state: "proposed",
-    });
-    await repo.updateSession(session.id, { current_round: round });
-    set({ session: { ...session, current_round: round } });
+    if (otherProposed) {
+      // pemain yang keluar (outId) menggantikan posisi inId di proposed lain
+      const oNewA = sw(otherProposed.teamA.playerIds, inId, outId);
+      const oNewB = sw(otherProposed.teamB.playerIds, inId, outId);
+      await repo.updateMatchTeams(otherProposed.id, oNewA, oNewB);
+    }
+
     await get().refresh();
     return { ok: true };
   },

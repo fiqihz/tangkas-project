@@ -2,7 +2,7 @@
 
 import { useMemo, useState } from "react";
 import { motion } from "framer-motion";
-import { Plus, Trash2, Pencil, Info, Play } from "lucide-react";
+import { Plus, Trash2, Pencil, Info, Play, Search } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent } from "@/components/ui/card";
 import { Input } from "@/components/ui/input";
@@ -12,6 +12,7 @@ import { Sheet, SheetContent, SheetTitle } from "@/components/ui/sheet";
 import type { Match, SessionPlayer } from "@/lib/domain/types";
 import { useSessionStore } from "@/lib/store/session-store";
 import { haptic } from "@/lib/haptics";
+import { cn } from "@/lib/utils";
 import { FinishMatchDialog } from "@/components/dialogs/finish-match-dialog";
 import { ManualFillDialog } from "@/components/dialogs/manual-fill-dialog";
 import { PlayerActionDialog } from "@/components/dialogs/player-action-dialog";
@@ -23,9 +24,9 @@ export function CourtsScreen() {
     addCourt,
     removeCourt,
     renameCourt,
-    currentMatchByCourt,
+    playingMatchByCourt,
+    proposedMatchByCourt,
     courtMatchNumber,
-    previewNextFour,
     startMatch,
     busyPlayerIds,
   } = useSessionStore();
@@ -37,6 +38,10 @@ export function CourtsScreen() {
     label: string;
   } | null>(null);
   const [playerAction, setPlayerAction] = useState<{
+    match: Match;
+    playerId: string;
+  } | null>(null);
+  const [previewEdit, setPreviewEdit] = useState<{
     match: Match;
     playerId: string;
   } | null>(null);
@@ -75,9 +80,13 @@ export function CourtsScreen() {
       )}
 
       {courts.map((court, i) => {
-        const match = currentMatchByCourt(court.id);
-        const preview =
-          match?.state === "playing" ? previewNextFour(court.id) : null;
+        const playing = playingMatchByCourt(court.id);
+        const proposed = proposedMatchByCourt(court.id);
+        // Match utama yang ditampilkan: yang sedang playing, atau kalau tidak
+        // ada, proposed yang siap dimulai.
+        const primary = playing ?? proposed;
+        // Preview terkunci hanya tampil kalau ada match playing + proposed.
+        const lockedPreview = playing && proposed ? proposed : null;
         return (
           <motion.div
             key={court.id}
@@ -111,25 +120,33 @@ export function CourtsScreen() {
                   </button>
                 </div>
 
-                {match ? (
+                {primary ? (
                   <>
                     <MatchView
-                      match={match}
-                      matchNumber={courtMatchNumber(court.id, match.id)}
+                      match={primary}
+                      matchNumber={courtMatchNumber(court.id, primary.id)}
                       byId={byId}
                       onFinish={() => {
                         haptic(12);
-                        setFinishFor(match);
+                        setFinishFor(primary);
                       }}
                       onStart={() => {
                         haptic(15);
-                        startMatch(match.id);
+                        startMatch(primary.id);
                       }}
                       onTapPlayer={(playerId) =>
-                        setPlayerAction({ match, playerId })
+                        setPlayerAction({ match: primary, playerId })
                       }
                     />
-                    {preview && <PreviewNext preview={preview} byId={byId} />}
+                    {lockedPreview && (
+                      <LockedPreview
+                        preview={lockedPreview}
+                        byId={byId}
+                        onTapPlayer={(playerId) =>
+                          setPreviewEdit({ match: lockedPreview, playerId })
+                        }
+                      />
+                    )}
                   </>
                 ) : (
                   <div className="flex flex-col gap-3">
@@ -180,6 +197,13 @@ export function CourtsScreen() {
           match={playerAction.match}
           player={byId.get(playerAction.playerId)!}
           onClose={() => setPlayerAction(null)}
+        />
+      )}
+      {previewEdit && (
+        <EditPreviewDialog
+          match={previewEdit.match}
+          playerId={previewEdit.playerId}
+          onClose={() => setPreviewEdit(null)}
         />
       )}
     </div>
@@ -298,43 +322,170 @@ function MatchView({
   );
 }
 
-function PreviewNext({
+function LockedPreview({
   preview,
   byId,
+  onTapPlayer,
 }: {
-  preview:
-    | { teamA: [string, string]; teamB: [string, string] }
-    | { reason: string };
+  preview: Match;
   byId: Map<string, SessionPlayer>;
+  onTapPlayer: (playerId: string) => void;
 }) {
-  const name = (id: string) => byId.get(id)?.name ?? "?";
+  const ids = [...preview.teamA.playerIds, ...preview.teamB.playerIds];
+  // Warning bila ada pemain preview yang statusnya sudah rest/left.
+  const problem = ids.filter((id) => {
+    const st = byId.get(id)?.status;
+    return st === "resting" || st === "left";
+  });
 
-  // Kasus: belum bisa rekomendasi (kurang pemain / kombinasi tidak valid)
-  if ("reason" in preview) {
+  const PlayerChip = ({ id }: { id: string }) => {
+    const p = byId.get(id);
+    const bad = p?.status === "resting" || p?.status === "left";
     return (
-      <div className="mt-3 rounded-xl border border-dashed border-border p-2.5 text-xs text-muted-foreground">
-        ⏭️ Rekomendasi berikutnya: {preview.reason}
-      </div>
+      <button
+        onClick={() => {
+          haptic(8);
+          onTapPlayer(id);
+        }}
+        className={cn(
+          "flex min-h-[36px] select-none items-center gap-1.5 rounded-lg border px-2 py-1 text-left text-sm transition-all active:scale-[0.97]",
+          bad
+            ? "border-destructive/50 bg-destructive/10"
+            : "border-border bg-background active:bg-secondary",
+        )}
+      >
+        <span className="truncate">{p?.name ?? "?"}</span>
+        <LevelBadge level={p?.level ?? null} className="shrink-0" />
+        {bad && <span className="shrink-0 text-xs text-destructive">⚠️</span>}
+      </button>
     );
-  }
+  };
 
   return (
     <div className="mt-3 rounded-xl border border-dashed border-border p-2.5">
-      <div className="mb-1.5 text-xs font-medium text-muted-foreground">
-        ⏭️ Rekomendasi main berikutnya (otomatis naik saat match ini selesai)
+      <div className="mb-2 flex items-center gap-1.5 text-xs font-medium text-muted-foreground">
+        ⏭️ Main berikutnya (terkunci — tap pemain untuk ganti)
       </div>
-      <div className="flex items-center justify-between gap-2 text-sm">
-        <span className="min-w-0 flex-1 truncate">
-          {preview.teamA.map(name).join(" & ")}
-        </span>
-        <span className="shrink-0 text-xs font-bold text-muted-foreground">
+      <div className="flex items-stretch gap-2">
+        <div className="flex min-w-0 flex-1 flex-col gap-1">
+          {preview.teamA.playerIds.map((id) => (
+            <PlayerChip key={id} id={id} />
+          ))}
+        </div>
+        <div className="flex shrink-0 items-center text-xs font-bold text-muted-foreground">
           vs
-        </span>
-        <span className="min-w-0 flex-1 truncate text-right">
-          {preview.teamB.map(name).join(" & ")}
-        </span>
+        </div>
+        <div className="flex min-w-0 flex-1 flex-col gap-1">
+          {preview.teamB.playerIds.map((id) => (
+            <PlayerChip key={id} id={id} />
+          ))}
+        </div>
       </div>
+      {problem.length > 0 && (
+        <p className="mt-2 text-xs text-destructive">
+          ⚠️ {problem.map((id) => byId.get(id)?.name).join(", ")} sudah
+          istirahat/pulang. Ganti dulu sebelum match ini mulai.
+        </p>
+      )}
     </div>
+  );
+}
+
+/**
+ * Dialog edit pemain di preview terkunci: ganti 1 pemain dengan pemain Active
+ * yang menunggu (bukan yang sedang main). Menukar dengan pemain di preview
+ * lapangan lain ditangani otomatis oleh store (tetap eksklusif).
+ */
+function EditPreviewDialog({
+  match,
+  playerId,
+  onClose,
+}: {
+  match: Match;
+  playerId: string;
+  onClose: () => void;
+}) {
+  const { players, editProposedPlayer, busyPlayerIds } = useSessionStore();
+  const [query, setQuery] = useState("");
+  const [msg, setMsg] = useState<string | null>(null);
+  const [working, setWorking] = useState(false);
+
+  const outPlayer = players.find((p) => p.id === playerId);
+  const busy = busyPlayerIds();
+  // Kandidat: Active menunggu (tidak sedang main / di preview) + ber-level.
+  const candidates = useMemo(() => {
+    const q = query.trim().toLowerCase();
+    return players.filter(
+      (p) =>
+        p.status === "active" &&
+        !busy.has(p.id) &&
+        p.level !== null &&
+        (!q || p.name.toLowerCase().includes(q)),
+    );
+  }, [players, busy, query]);
+
+  const pick = async (inId: string) => {
+    haptic(15);
+    setWorking(true);
+    const res = await editProposedPlayer(match.id, playerId, inId);
+    setWorking(false);
+    if (!res.ok) return setMsg(res.reason ?? "Gagal.");
+    onClose();
+  };
+
+  return (
+    <Sheet open onOpenChange={(o) => !o && onClose()}>
+      <SheetContent>
+        <SheetTitle className="text-lg font-bold">
+          Ganti {outPlayer?.name}
+        </SheetTitle>
+        <p className="mt-1 text-sm text-muted-foreground">
+          Pilih pemain pengganti dari yang sedang menunggu.
+        </p>
+        {msg && <p className="mt-2 text-sm text-destructive">{msg}</p>}
+
+        <div className="relative mt-3 mb-2">
+          <Search
+            size={16}
+            className="absolute left-3 top-1/2 -translate-y-1/2 text-muted-foreground"
+          />
+          <Input
+            placeholder="Cari nama…"
+            value={query}
+            onChange={(e) => setQuery(e.target.value)}
+            className="pl-9"
+          />
+        </div>
+
+        <div className="flex max-h-[45vh] flex-col gap-1.5 overflow-y-auto">
+          {candidates.length === 0 && (
+            <p className="py-4 text-center text-sm text-muted-foreground">
+              Tidak ada pemain menunggu yang tersedia.
+            </p>
+          )}
+          {candidates.map((c) => (
+            <button
+              key={c.id}
+              onClick={() => pick(c.id)}
+              disabled={working}
+              className="flex min-h-[48px] select-none items-center justify-between gap-2 rounded-xl border border-border bg-card px-3 py-2 text-left text-sm transition-all active:scale-[0.98] active:bg-secondary"
+            >
+              <span className="flex min-w-0 items-center gap-2">
+                <span className="truncate font-medium">{c.name}</span>
+                <LevelBadge level={c.level} className="shrink-0" />
+              </span>
+              <span className="shrink-0 text-xs text-muted-foreground">
+                {c.gamesPlayed}x
+              </span>
+            </button>
+          ))}
+        </div>
+
+        <Button className="mt-4 w-full" variant="ghost" onClick={onClose}>
+          Batal
+        </Button>
+      </SheetContent>
+    </Sheet>
   );
 }
 

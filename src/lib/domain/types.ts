@@ -89,6 +89,12 @@ export interface MatchmakingConfig {
   justPlayedPenalty: number;
   /** Jumlah kandidat kombinasi yang dicoba per pembentukan match. */
   candidateSamples: number;
+  /**
+   * Toleransi selisih bobot antar tim yang dianggap "sama-sama seimbang".
+   * Selisih <= nilai ini tidak dihukum (efektif 0). Membuat level tinggi
+   * (mis. Advanced) bisa lawan sesama kelas, tidak selalu digendong.
+   */
+  imbalanceTolerance: number;
 }
 
 export const DEFAULT_CONFIG: MatchmakingConfig = {
@@ -97,6 +103,7 @@ export const DEFAULT_CONFIG: MatchmakingConfig = {
   repeatOpponentWeight: 3,
   justPlayedPenalty: 8,
   candidateSamples: 400,
+  imbalanceTolerance: 2,
 };
 
 /** Bobot numerik tiap level. */
