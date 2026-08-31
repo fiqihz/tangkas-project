@@ -7,8 +7,9 @@ import { Card, CardContent } from "@/components/ui/card";
 import { Input } from "@/components/ui/input";
 import { LevelBadge } from "@/components/ui/level-badge";
 import { LevelSelect } from "@/components/ui/level-select";
+import { GenderSelect, GenderBadge } from "@/components/ui/gender-select";
 import { Fab } from "@/components/ui/fab";
-import type { Level, PlayerStatus, SessionPlayer } from "@/lib/domain/types";
+import type { Gender, Level, PlayerStatus, SessionPlayer } from "@/lib/domain/types";
 import { useSessionStore } from "@/lib/store/session-store";
 import { haptic } from "@/lib/haptics";
 import { cn } from "@/lib/utils";
@@ -22,7 +23,8 @@ const STATUS_LABEL: Record<PlayerStatus, string> = {
 };
 
 export function PlayersScreen() {
-  const { players, setPlayerLevel, setPlayerStatus } = useSessionStore();
+  const { players, setPlayerLevel, setPlayerStatus, setPlayerGender } =
+    useSessionStore();
   const [expanded, setExpanded] = useState<string | null>(null);
   const [adding, setAdding] = useState(false);
   const [query, setQuery] = useState("");
@@ -95,6 +97,7 @@ export function PlayersScreen() {
                     expanded={expanded === p.id}
                     onToggle={() => setExpanded(expanded === p.id ? null : p.id)}
                     onSetLevel={(lv) => setPlayerLevel(p.id, lv)}
+                    onSetGender={(g) => setPlayerGender(p.id, g)}
                     onSetStatus={(s) => setPlayerStatus(p.id, s)}
                   />
                 ))}
@@ -124,12 +127,14 @@ function PlayerRow({
   expanded,
   onToggle,
   onSetLevel,
+  onSetGender,
   onSetStatus,
 }: {
   player: SessionPlayer;
   expanded: boolean;
   onToggle: () => void;
   onSetLevel: (lv: Level) => void;
+  onSetGender: (g: Gender) => void;
   onSetStatus: (s: PlayerStatus) => void;
 }) {
   return (
@@ -145,6 +150,7 @@ function PlayerRow({
           <div className="flex items-center gap-2">
             <span className="font-medium">{player.name}</span>
             <LevelBadge level={player.level} />
+            <GenderBadge gender={player.gender} />
           </div>
           <span className="text-xs text-muted-foreground">
             {player.gamesPlayed}x main
@@ -160,6 +166,16 @@ function PlayerRow({
               <LevelSelect
                 value={player.level}
                 onChange={onSetLevel}
+                size="sm"
+              />
+            </div>
+            <div>
+              <div className="mb-1 text-xs text-muted-foreground">
+                Set gender {player.gender === null && "(belum di-set)"}
+              </div>
+              <GenderSelect
+                value={player.gender}
+                onChange={onSetGender}
                 size="sm"
               />
             </div>
