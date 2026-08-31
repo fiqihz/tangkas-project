@@ -58,26 +58,34 @@ export function FinalResultScreen({
                 <table className="w-full text-sm">
                   <thead className="bg-secondary text-xs text-muted-foreground">
                     <tr>
-                      <th className="px-2 py-2 text-left">#</th>
-                      <th className="px-2 py-2 text-left">Pemain</th>
-                      <th className="px-2 py-2 text-center">M</th>
-                      <th className="px-2 py-2 text-center">K</th>
-                      <th className="px-2 py-2 text-center">Diff</th>
-                      <th className="px-2 py-2 text-center">Poin</th>
+                      <th className="px-1.5 py-2 text-left">#</th>
+                      <th className="px-1.5 py-2 text-left">Pemain</th>
+                      <th className="px-1.5 py-2 text-center">M</th>
+                      <th className="px-1.5 py-2 text-center">K</th>
+                      <th className="px-1.5 py-2 text-center">WR</th>
+                      <th className="px-1.5 py-2 text-center">+M</th>
+                      <th className="px-1.5 py-2 text-center">Diff</th>
+                      <th className="px-1.5 py-2 text-center">Poin</th>
                     </tr>
                   </thead>
                   <tbody>
                     {rest.map((r) => (
                       <tr key={r.playerId} className="border-t border-border">
-                        <td className="px-2 py-2 font-semibold">{r.rank}</td>
-                        <td className="px-2 py-2 font-medium">{r.name}</td>
-                        <td className="px-2 py-2 text-center">{r.wins}</td>
-                        <td className="px-2 py-2 text-center">{r.losses}</td>
-                        <td className="px-2 py-2 text-center">
+                        <td className="px-1.5 py-2 font-semibold">{r.rank}</td>
+                        <td className="px-1.5 py-2 font-medium">{r.name}</td>
+                        <td className="px-1.5 py-2 text-center">{r.wins}</td>
+                        <td className="px-1.5 py-2 text-center">{r.losses}</td>
+                        <td className="px-1.5 py-2 text-center text-muted-foreground">
+                          {r.winRate}%
+                        </td>
+                        <td className="px-1.5 py-2 text-center text-primary">
+                          {r.bonus > 0 ? `+${r.bonus}` : "-"}
+                        </td>
+                        <td className="px-1.5 py-2 text-center">
                           {r.pointDiff >= 0 ? "+" : ""}
                           {r.pointDiff}
                         </td>
-                        <td className="px-2 py-2 text-center">
+                        <td className="px-1.5 py-2 text-center">
                           {r.pointsScored}
                         </td>
                       </tr>

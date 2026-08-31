@@ -110,6 +110,7 @@ interface SessionState {
     preferred: SessionPlayer[];
     others: SessionPlayer[];
     playing: SessionPlayer[];
+    sameMatch: SessionPlayer[];
   };
   incrementSessionsForPlayed: () => Promise<void>;
 
@@ -678,7 +679,43 @@ export const useSessionStore = create<SessionState>((set, get) => ({
     const byId = byIdMap(players);
     const replacement = byId.get(replacementId);
 
-    // Deteksi apakah pengganti sedang bermain di match lain (proposed/playing).
+    const inThisMatch = [
+      ...match.teamA.playerIds,
+      ...match.teamB.playerIds,
+    ].includes(replacementId);
+
+    const swapIn = (
+      t: [string, string],
+      from: string,
+      to: string,
+    ): [string, string] =>
+      t.map((id) => (id === from ? to : id)) as [string, string];
+
+    // KASUS 1: swap DALAM match yang sama (tukar posisi/tim antar pemain di match ini).
+    // Mis. tukar lawan jadi partner. Tidak mengubah status pemain.
+    if (inThisMatch && replacementId !== leavingId) {
+      // Tukar posisi leavingId <-> replacementId di dalam match ini.
+      const sw = (t: [string, string]): [string, string] =>
+        t.map((id) =>
+          id === leavingId ? replacementId : id === replacementId ? leavingId : id,
+        ) as [string, string];
+      const newA = sw(match.teamA.playerIds);
+      const newB = sw(match.teamB.playerIds);
+
+      // Validasi hard rule kedua tim setelah swap.
+      const lv = (id: string) => byId.get(id)?.level ?? null;
+      const twoNewbie = (t: [string, string]) =>
+        t.every((id) => lv(id) === "newbie");
+      if (twoNewbie(newA) || twoNewbie(newB)) {
+        return { ok: false, reason: "Swap menghasilkan Newbie+Newbie." };
+      }
+
+      await repo.updateMatchTeams(matchId, newA, newB);
+      await get().refresh();
+      return { ok: true };
+    }
+
+    // Deteksi apakah pengganti sedang bermain di match LAIN (proposed/playing).
     // Jika ya -> lakukan SWAP (tukar posisi antar 2 match). Jika tidak -> replace biasa.
     const otherMatch = matches.find(
       (m) =>
@@ -695,13 +732,6 @@ export const useSessionStore = create<SessionState>((set, get) => ({
     if (partner?.level === "newbie" && replacement?.level === "newbie") {
       return { ok: false, reason: "Newbie tidak boleh setim dengan Newbie." };
     }
-
-    const swapIn = (
-      t: [string, string],
-      from: string,
-      to: string,
-    ): [string, string] =>
-      t.map((id) => (id === from ? to : id)) as [string, string];
 
     if (otherMatch) {
       // SWAP: replacement (di otherMatch) <-> leavingId (di match ini).
@@ -757,7 +787,7 @@ export const useSessionStore = create<SessionState>((set, get) => ({
   substituteCandidates(matchId, leavingId) {
     const { matches, players } = get();
     const match = matches.find((m) => m.id === matchId);
-    if (!match) return { preferred: [], others: [], playing: [] };
+    if (!match) return { preferred: [], others: [], playing: [], sameMatch: [] };
 
     const byId = byIdMap(players);
     const inA = match.teamA.playerIds.includes(leavingId);
@@ -808,7 +838,13 @@ export const useSessionStore = create<SessionState>((set, get) => ({
     const preferred = scored.slice(0, 3).map((s) => s.player);
     const others = legal.filter((c) => !preferredIds.has(c.id));
 
-    return { preferred, others, playing };
+    // Kandidat SWAP di lapangan yang SAMA: 3 pemain lain di match ini
+    // (untuk tukar posisi/tim, mis. tukar lawan jadi partner).
+    const sameMatch = players.filter(
+      (p) => inMatch.has(p.id) && p.id !== leavingId,
+    );
+
+    return { preferred, others, playing, sameMatch };
   },
 }));
 

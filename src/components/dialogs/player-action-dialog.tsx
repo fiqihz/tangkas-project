@@ -45,7 +45,7 @@ export function PlayerActionDialog({
 
   const leavingStatus: PlayerStatus = intent === "rest" ? "resting" : "active";
 
-  const { preferred, others, playing } = useMemo(
+  const { preferred, others, playing, sameMatch } = useMemo(
     () => substituteCandidates(match.id, player.id),
     [substituteCandidates, match.id, player.id],
   );
@@ -219,11 +219,31 @@ export function PlayerActionDialog({
               </div>
             </div>
 
-            {/* Tukar dengan pemain yang sedang main (hanya untuk niat "ganti/tukar") */}
+            {/* Tukar di lapangan yang SAMA (tukar posisi/tim antar pemain di match ini) */}
+            {intent === "correct" && sameMatch.length > 0 && (
+              <div className="mt-4">
+                <div className="mb-1.5 text-xs font-semibold text-muted-foreground">
+                  Tukar posisi di lapangan ini
+                </div>
+                <div className="flex flex-col gap-1.5">
+                  {sameMatch.map((c) => (
+                    <CandidateRow
+                      key={c.id}
+                      player={c}
+                      onPick={() => doManual(c.id)}
+                      disabled={working}
+                      swap
+                    />
+                  ))}
+                </div>
+              </div>
+            )}
+
+            {/* Tukar dengan pemain yang sedang main di lapangan LAIN */}
             {intent === "correct" && filteredPlaying.length > 0 && (
               <div className="mt-4">
                 <div className="mb-1.5 text-xs font-semibold text-muted-foreground">
-                  Tukar dengan yang sedang main
+                  Tukar dengan yang sedang main (lapangan lain)
                 </div>
                 <div className="flex max-h-[30vh] flex-col gap-1.5 overflow-y-auto">
                   {filteredPlaying.map((c) => (
