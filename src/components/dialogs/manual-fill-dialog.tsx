@@ -25,8 +25,18 @@ export function ManualFillDialog({
   const [submitting, setSubmitting] = useState(false);
 
   const busy = busyPlayerIds();
+  // Urutkan berdasarkan waktu check-in (first come first play) — biar host tahu
+  // siapa yang datang duluan saat menyusun match pertama.
   const candidates = useMemo(
-    () => players.filter((p) => p.status === "active" && !busy.has(p.id)),
+    () =>
+      players
+        .filter((p) => p.status === "active" && !busy.has(p.id))
+        .sort((a, b) => {
+          const at = a.checkedInAt ?? "";
+          const bt = b.checkedInAt ?? "";
+          if (at !== bt) return at.localeCompare(bt);
+          return a.name.localeCompare(b.name);
+        }),
     [players, busy],
   );
 
