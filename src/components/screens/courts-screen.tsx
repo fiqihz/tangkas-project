@@ -28,7 +28,6 @@ export function CourtsScreen() {
     proposedMatchByCourt,
     courtMatchNumber,
     startMatch,
-    busyPlayerIds,
   } = useSessionStore();
 
   const [finishFor, setFinishFor] = useState<Match | null>(null);
@@ -48,16 +47,27 @@ export function CourtsScreen() {
 
   const byId = useMemo(() => new Map(players.map((p) => [p.id, p])), [players]);
 
-  const busy = busyPlayerIds();
   const activePlayers = players.filter((p) => p.status === "active");
-  const waiting = activePlayers.filter((p) => !busy.has(p.id));
+  // "Main" = pemain di match yang sedang playing. Pemain di preview (proposed)
+  // dianggap masih "menunggu" giliran, bukan main.
+  const playingIds = new Set<string>();
+  for (const m of useSessionStore.getState().matches) {
+    if (m.state === "playing") {
+      [...m.teamA.playerIds, ...m.teamB.playerIds].forEach((id) =>
+        playingIds.add(id),
+      );
+    }
+  }
+  const playingCount = activePlayers.filter((p) => playingIds.has(p.id)).length;
+  const waiting = activePlayers.filter((p) => !playingIds.has(p.id));
   const noLevelWaiting = waiting.filter((p) => p.level === null);
 
   return (
     <div className="flex flex-col gap-4">
       <div className="flex items-center justify-between">
         <span className="text-sm text-muted-foreground">
-          {activePlayers.length} aktif · {waiting.length} menunggu
+          {activePlayers.length} aktif · {playingCount} main · {waiting.length}{" "}
+          menunggu
         </span>
       </div>
 
@@ -348,15 +358,17 @@ function LockedPreview({
           onTapPlayer(id);
         }}
         className={cn(
-          "flex min-h-[36px] select-none items-center gap-1.5 rounded-lg border px-2 py-1 text-left text-sm transition-all active:scale-[0.97]",
+          "flex min-h-[44px] w-full select-none flex-col gap-0.5 rounded-lg border px-2 py-1.5 text-left transition-all active:scale-[0.98]",
           bad
             ? "border-destructive/50 bg-destructive/10"
             : "border-border bg-background active:bg-secondary",
         )}
       >
-        <span className="truncate">{p?.name ?? "?"}</span>
-        <LevelBadge level={p?.level ?? null} className="shrink-0" />
-        {bad && <span className="shrink-0 text-xs text-destructive">⚠️</span>}
+        <span className="flex items-center gap-1 truncate text-sm font-medium">
+          {p?.name ?? "?"}
+          {bad && <span className="shrink-0 text-xs text-destructive">⚠️</span>}
+        </span>
+        <LevelBadge level={p?.level ?? null} className="w-fit shrink-0" />
       </button>
     );
   };
@@ -367,7 +379,7 @@ function LockedPreview({
         ⏭️ Main berikutnya (terkunci — tap pemain untuk ganti)
       </div>
       <div className="flex items-stretch gap-2">
-        <div className="flex min-w-0 flex-1 flex-col gap-1">
+        <div className="flex min-w-0 flex-1 flex-col gap-1.5">
           {preview.teamA.playerIds.map((id) => (
             <PlayerChip key={id} id={id} />
           ))}
@@ -375,7 +387,7 @@ function LockedPreview({
         <div className="flex shrink-0 items-center text-xs font-bold text-muted-foreground">
           vs
         </div>
-        <div className="flex min-w-0 flex-1 flex-col gap-1">
+        <div className="flex min-w-0 flex-1 flex-col gap-1.5">
           {preview.teamB.playerIds.map((id) => (
             <PlayerChip key={id} id={id} />
           ))}
