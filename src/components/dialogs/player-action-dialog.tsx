@@ -64,9 +64,11 @@ export function PlayerActionDialog({
     [substituteCandidates, match.id, player.id],
   );
 
-  // Kandidat untuk mode PREVIEW: pemain menunggu + pemain di preview lain (swap).
+  // Kandidat untuk mode PREVIEW: pemain menunggu + pemain preview yang sama
+  // (tukar posisi) + pemain di preview lain (swap antar lapangan).
   const previewCandidates = useMemo(() => {
-    if (!isPreview) return { waiting: [], otherPreview: [] };
+    if (!isPreview)
+      return { waiting: [], samePreview: [], otherPreview: [] };
     const playingIds = new Set<string>();
     const otherPreviewIds = new Set<string>();
     for (const m of matches) {
@@ -80,10 +82,8 @@ export function PlayerActionDialog({
         );
       }
     }
-    const inThis = new Set([
-      ...match.teamA.playerIds,
-      ...match.teamB.playerIds,
-    ]);
+    const inThisIds = [...match.teamA.playerIds, ...match.teamB.playerIds];
+    const inThis = new Set(inThisIds);
     const waiting = players.filter(
       (p) =>
         p.status === "active" &&
@@ -92,9 +92,14 @@ export function PlayerActionDialog({
         !otherPreviewIds.has(p.id) &&
         !inThis.has(p.id),
     );
+    // 3 pemain lain di preview yang SAMA (untuk tukar posisi/tim).
+    const samePreview = inThisIds
+      .filter((id) => id !== player.id)
+      .map((id) => players.find((p) => p.id === id))
+      .filter((p): p is SessionPlayer => Boolean(p));
     const otherPreview = players.filter((p) => otherPreviewIds.has(p.id));
-    return { waiting, otherPreview };
-  }, [isPreview, matches, players, match.id, match.teamA, match.teamB]);
+    return { waiting, samePreview, otherPreview };
+  }, [isPreview, matches, players, match.id, match.teamA, match.teamB, player.id]);
 
   const applyQuery = (list: SessionPlayer[]) => {
     const q = query.trim().toLowerCase();
@@ -239,6 +244,19 @@ export function PlayerActionDialog({
                       <EmptyRow />
                     )}
                   </Section>
+                  {previewCandidates.samePreview.length > 0 && (
+                    <Section title="Tukar posisi di preview ini">
+                      {previewCandidates.samePreview.map((c) => (
+                        <CandidateRow
+                          key={c.id}
+                          player={c}
+                          onPick={() => doPick(c.id)}
+                          disabled={working}
+                          tag="preview ini"
+                        />
+                      ))}
+                    </Section>
+                  )}
                   {applyQuery(previewCandidates.otherPreview).length > 0 && (
                     <Section title="Tukar dengan preview lapangan lain">
                       {applyQuery(previewCandidates.otherPreview).map((c) => (

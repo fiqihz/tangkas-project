@@ -486,11 +486,32 @@ export const useSessionStore = create<SessionState>((set, get) => ({
     // Eksklusif: kecualikan semua pemain yang sudah di proposed/playing mana pun.
     const busy = get().busyPlayerIds();
     const pool = availablePool(players, { requireLevel: true, excludeIds: busy });
-    if (pool.length < 4) return { ok: false, reason: "Pemain tersedia < 4." };
+    if (pool.length < 4) {
+      // Bangun penjelasan kenapa pemain kurang.
+      const notCheckedIn = players.filter(
+        (p) => p.status === "registered",
+      ).length;
+      const noLevel = players.filter(
+        (p) => p.status === "active" && p.level === null && !busy.has(p.id),
+      ).length;
+      const parts: string[] = [`Pemain siap cuma ${pool.length} (butuh 4).`];
+      if (notCheckedIn > 0)
+        parts.push(`${notCheckedIn} pemain belum check-in — check-in di tab Pemain.`);
+      if (noLevel > 0)
+        parts.push(`${noLevel} pemain Active belum di-set level.`);
+      if (notCheckedIn === 0 && noLevel === 0)
+        parts.push("Semua pemain lain sedang main atau sudah di preview.");
+      return { ok: false, reason: parts.join(" ") };
+    }
 
     const round = session.current_round + 1;
     const prop = generateMatch(pool, history, round);
-    if (!prop) return { ok: false, reason: "Tidak ada kombinasi valid." };
+    if (!prop)
+      return {
+        ok: false,
+        reason:
+          "Tidak ada kombinasi valid dari pemain tersedia (cek aturan level Newbie).",
+      };
 
     const courtLabel = courts.find((c) => c.id === courtId)?.label ?? null;
     await repo.createMatch({
@@ -615,6 +636,31 @@ export const useSessionStore = create<SessionState>((set, get) => ({
     const byId = byIdMap(players);
     const replacement = byId.get(inId);
     if (!replacement) return { ok: false, reason: "Pemain tidak ditemukan." };
+
+    const inThisMatch = [
+      ...match.teamA.playerIds,
+      ...match.teamB.playerIds,
+    ].includes(inId);
+
+    // KASUS: tukar posisi antar 2 pemain di preview yang SAMA (mis. tukar
+    // partner jadi lawan). Tukar posisi outId <-> inId di dalam match ini.
+    if (inThisMatch && inId !== outId) {
+      const swap2 = (t: [string, string]): [string, string] =>
+        t.map((id) =>
+          id === outId ? inId : id === inId ? outId : id,
+        ) as [string, string];
+      const nA = swap2(match.teamA.playerIds);
+      const nB = swap2(match.teamB.playerIds);
+      const lv = (id: string) => byId.get(id)?.level ?? null;
+      const twoNewbie = (t: [string, string]) =>
+        t.every((id) => lv(id) === "newbie");
+      if (twoNewbie(nA) || twoNewbie(nB)) {
+        return { ok: false, reason: "Swap menghasilkan Newbie+Newbie." };
+      }
+      await repo.updateMatchTeams(matchId, nA, nB);
+      await get().refresh();
+      return { ok: true };
+    }
 
     // Tentukan partner dari pemain yang keluar (untuk validasi hard rule).
     const inA = match.teamA.playerIds.includes(outId);

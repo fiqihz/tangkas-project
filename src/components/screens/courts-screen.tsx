@@ -9,6 +9,7 @@ import { Input } from "@/components/ui/input";
 import { LevelBadge } from "@/components/ui/level-badge";
 import { Fab } from "@/components/ui/fab";
 import { Sheet, SheetContent, SheetTitle } from "@/components/ui/sheet";
+import { Toast } from "@/components/ui/toast";
 import type { Match, SessionPlayer } from "@/lib/domain/types";
 import { useSessionStore } from "@/lib/store/session-store";
 import { haptic } from "@/lib/haptics";
@@ -78,12 +79,6 @@ export function CourtsScreen() {
             ikut rekomendasi otomatis. Set level mereka di tab Pemain, atau isi
             manual.
           </span>
-        </div>
-      )}
-
-      {autoFillMsg && (
-        <div className="rounded-xl bg-amber-100 px-3 py-2.5 text-sm text-amber-900 dark:bg-amber-900/40 dark:text-amber-100">
-          {autoFillMsg}
         </div>
       )}
 
@@ -221,6 +216,8 @@ export function CourtsScreen() {
           onClose={() => setPlayerAction(null)}
         />
       )}
+
+      <Toast message={autoFillMsg} onClose={() => setAutoFillMsg(null)} />
     </div>
   );
 }
