@@ -124,4 +124,32 @@ describe("mode: kelas", () => {
     const n4 = p("N4", "newbie", null);
     expect(isValidMatchupForMode(n1, n2, n3, n4, "kelas")).toBe(false);
   });
+
+  it("tolak Intermediate/Intermediate vs Advanced/Advanced (kelas beda)", () => {
+    const i1 = p("I1", "intermediate", null);
+    const i2 = p("I2", "intermediate", null);
+    const a1 = p("A1", "advanced", null);
+    const a2 = p("A2", "advanced", null);
+    // Tim seragam masing-masing, tapi antar tim beda kelas -> tidak valid.
+    expect(isValidMatchupForMode(i1, i2, a1, a2, "kelas")).toBe(false);
+  });
+
+  it("terima Intermediate vs Intermediate (kelas sama)", () => {
+    const i1 = p("I1", "intermediate", null);
+    const i2 = p("I2", "intermediate", null);
+    const i3 = p("I3", "intermediate", null);
+    const i4 = p("I4", "intermediate", null);
+    expect(isValidMatchupForMode(i1, i2, i3, i4, "kelas")).toBe(true);
+  });
+
+  it("generateMatch kelas gagal bila hanya ada 2 Int + 2 Adv", () => {
+    const pool = [
+      p("I1", "intermediate", null),
+      p("I2", "intermediate", null),
+      p("A1", "advanced", null),
+      p("A2", "advanced", null),
+    ];
+    const m = generateMatch(pool, new MatchHistory(), 2, undefined, "kelas");
+    expect(m).toBeNull(); // tidak ada 4 pemain sekelas
+  });
 });

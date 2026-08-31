@@ -68,11 +68,6 @@ function isCarryTeam(a: SessionPlayer, b: SessionPlayer): boolean {
   return isStrong(a) !== isStrong(b); // tepat satu yang kuat
 }
 
-/** Apakah sebuah tim sesama level (untuk mode kelas). */
-function isSameClassTeam(a: SessionPlayer, b: SessionPlayer): boolean {
-  return a.level === b.level;
-}
-
 /**
  * Validitas matchup untuk mode tertentu (HARD rule per mode).
  * - balanced/kelas/gendongan/mixed: Newbie+Newbie tetap dilarang.
@@ -107,10 +102,19 @@ export function isValidMatchupForMode(
   }
 
   if (mode === "kelas") {
-    // Utamakan tim sesama level. Newbie dikecualikan (tidak boleh sesama
-    // Newbie) — Newbie ditangani lewat isValidMatchup + skor preferensi.
-    if (a1.level !== "newbie" && !isSameClassTeam(a1, a2)) return false;
-    if (b1.level !== "newbie" && !isSameClassTeam(b1, b2)) return false;
+    // "Sesuai kelas" = level yang SAMA saling bertemu (Int vs Int, Adv vs Adv).
+    // Bukan sekadar tiap tim seragam — kedua tim & keempat pemain harus level
+    // yang sama. Newbie dikecualikan dari aturan ini (tidak boleh sesama
+    // Newbie), jadi Newbie ditangani lewat isValidMatchup + skor preferensi.
+    const nonNewbie = four.filter((p) => p.level !== "newbie");
+    if (nonNewbie.length > 0) {
+      // Semua pemain non-Newbie harus level identik. Bila ada campuran
+      // (mis. Intermediate & Advanced), tolak.
+      const lvl = nonNewbie[0].level;
+      if (!nonNewbie.every((p) => p.level === lvl)) return false;
+    }
+    // Bila keempatnya non-Newbie & sudah lolos di atas, tiap tim otomatis
+    // sama level. Tetap validasi hard rule Newbie+Newbie.
     return isValidMatchup(a1, a2, b1, b2);
   }
 
