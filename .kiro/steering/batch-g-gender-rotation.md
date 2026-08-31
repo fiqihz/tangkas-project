@@ -2,7 +2,12 @@
 inclusion: manual
 ---
 
-# Batch G — Gender + Rotasi Per-Ronde (DITUNDA, belum dikerjakan)
+# Batch G — Gender + Mode Match (SUDAH DIIMPLEMENTASI)
+
+> **Status: DIIMPLEMENTASI** di branch `batch-g-gender-mode` (belum merge ke `main`).
+> Keputusan final berbeda dari rancangan awal di bawah: **host memilih mode saat
+> menekan Auto-fill** (bukan rotasi otomatis per ronde). Dokumentasi final ada di
+> `DESIGN.md` §16. Bagian di bawah dipertahankan sebagai catatan rancangan/histori.
 
 Catatan lengkap untuk dibahas mendalam sebelum diimplementasi. Semua poin lain
 (Batch A–F) sudah selesai. Batch ini sengaja ditunda atas permintaan user karena
@@ -60,5 +65,16 @@ Butuh penambahan **gender** setiap player karena skema permainan berubah:
 
 ## Status
 
-BELUM DIKERJAKAN. Aktifkan file ini (#batch-g-gender-rotation) saat user siap
-membahas detailnya. Jawab dulu 4 pertanyaan desain di atas sebelum implementasi.
+**DIIMPLEMENTASI** (branch `batch-g-gender-mode`, belum merge ke `main`).
+
+Keputusan final vs 4 pertanyaan desain di atas:
+1. **Ronde per-lapangan atau global?** → Tidak relevan lagi. Tidak ada siklus
+   otomatis per ronde; **host memilih mode manual** tiap kali Auto-fill per lapangan.
+2. **Campuran wajib/best-effort?** → **Best-effort**; kalau komposisi tak cukup,
+   Auto-fill gagal dengan toast alasan spesifik.
+3. **Definisi gendongan** → tiap tim 1 kuat (Intermediate/Advanced) + 1 lemah
+   (Newbie/Beginner), dua tim dibuat seimbang.
+4. **Pola ronde ke-4 dst** → Tidak ada pola tetap; host bebas pilih mode tiap Auto-fill.
+
+Mode yang dibuat: Seimbang, Campuran, Ganda Putri (relax Newbie — Opsi B),
+Gendongan, Sesuai Kelas. Ganda Putra tidak dibuat. Detail final: `DESIGN.md` §16.

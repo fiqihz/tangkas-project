@@ -7,6 +7,7 @@ import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { LevelBadge } from "@/components/ui/level-badge";
 import { LevelSelect } from "@/components/ui/level-select";
+import { GenderSelect } from "@/components/ui/gender-select";
 import { Sheet, SheetContent, SheetTitle } from "@/components/ui/sheet";
 import { haptic } from "@/lib/haptics";
 import type { Match, PlayerStatus, SessionPlayer } from "@/lib/domain/types";
@@ -46,6 +47,7 @@ export function PlayerActionDialog({
     players,
     matches,
     setPlayerLevel,
+    setPlayerGender,
   } = useSessionStore();
 
   const isPreview = match.state === "proposed";
@@ -165,6 +167,20 @@ export function PlayerActionDialog({
                 onChange={(lv) => {
                   haptic(8);
                   setPlayerLevel(player.id, lv);
+                }}
+                size="sm"
+              />
+            </div>
+
+            <div className="mt-3">
+              <div className="mb-1 text-xs text-muted-foreground">
+                Set gender {player.gender === null && "(belum di-set)"}
+              </div>
+              <GenderSelect
+                value={player.gender}
+                onChange={(g) => {
+                  haptic(8);
+                  setPlayerGender(player.id, g);
                 }}
                 size="sm"
               />

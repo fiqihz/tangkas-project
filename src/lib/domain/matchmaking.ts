@@ -1,9 +1,10 @@
 import { MatchHistory } from "./history";
 import { sortByQueuePriority } from "./queue";
-import { isValidMatchup, teamImbalance } from "./rules";
+import { isValidMatchupForMode, teamImbalance } from "./rules";
 import {
   DEFAULT_CONFIG,
   type MatchmakingConfig,
+  type MatchMode,
   type SessionPlayer,
 } from "./types";
 
@@ -42,8 +43,9 @@ function scoreSplit(
   b2: SessionPlayer,
   history: MatchHistory,
   cfg: MatchmakingConfig,
+  mode: MatchMode,
 ): number | null {
-  if (!isValidMatchup(a1, a2, b1, b2)) return null;
+  if (!isValidMatchupForMode(a1, a2, b1, b2, mode)) return null;
 
   const rawImbalance = teamImbalance(a1, a2, b1, b2);
   // Toleransi: selisih bobot <= tolerance dianggap "sama-sama seimbang"
@@ -76,12 +78,13 @@ export function bestSplitForFour(
   four: SessionPlayer[],
   history: MatchHistory,
   cfg: MatchmakingConfig = DEFAULT_CONFIG,
+  mode: MatchMode = "balanced",
 ): ProposedMatch | null {
   if (four.length !== 4) return null;
 
   let best: ProposedMatch | null = null;
   for (const [[i, j], [k, l]] of TEAM_SPLITS) {
-    const s = scoreSplit(four[i], four[j], four[k], four[l], history, cfg);
+    const s = scoreSplit(four[i], four[j], four[k], four[l], history, cfg, mode);
     if (s === null) continue;
     if (best === null || s < best.score) {
       best = {
@@ -131,13 +134,16 @@ export function generateMatch(
   history: MatchHistory,
   currentRound: number,
   cfg: MatchmakingConfig = DEFAULT_CONFIG,
+  mode: MatchMode = "balanced",
 ): ProposedMatch | null {
   if (pool.length < 4) return null;
 
   const candidates = pickCandidatePlayers(pool, currentRound, cfg);
-  // Batasi ruang pencarian pada kandidat teratas untuk menjaga performa,
-  // tapi cukup lebar agar tetap ada variasi & keadilan.
-  const window = candidates.slice(0, Math.min(candidates.length, 10));
+  // Batasi ruang pencarian pada kandidat teratas untuk menjaga performa.
+  // Untuk mode dengan constraint komposisi (gender/gendongan/kelas), lebarkan
+  // window agar lebih mungkin menemukan kombinasi valid.
+  const windowSize = mode === "balanced" ? 10 : 14;
+  const window = candidates.slice(0, Math.min(candidates.length, windowSize));
 
   let best: (ProposedMatch & { queuePenalty: number }) | null = null;
   let bestTotal = Infinity;
@@ -147,7 +153,7 @@ export function generateMatch(
 
   for (const [i, j, k, l] of tried) {
     const four = [window[i], window[j], window[k], window[l]];
-    const split = bestSplitForFour(four, history, cfg);
+    const split = bestSplitForFour(four, history, cfg, mode);
     if (!split) continue;
 
     // Penalti antrian: makin ke belakang indeks pemain, makin besar penalti,

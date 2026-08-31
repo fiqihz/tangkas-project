@@ -27,6 +27,7 @@ function mk(name: string, level: Level, status: PlayerStatus = "registered"): Se
     id: `p${idc}`,
     name,
     level,
+    gender: null,
     status,
     gamesPlayed: 0,
     lastPlayedRound: null,

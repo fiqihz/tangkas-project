@@ -14,6 +14,7 @@ export interface DbPlayerProfile {
   community_id: string;
   name: string;
   level: Level | null;
+  gender: "male" | "female" | null;
   sessions_played: number;
   created_at: string;
   updated_at: string;
@@ -39,6 +40,7 @@ export interface DbSessionPlayer {
   profile_id: string | null;
   name: string;
   level: Level | null;
+  gender: "male" | "female" | null;
   status: PlayerStatus;
   checked_in_at: string | null;
   games_played: number;

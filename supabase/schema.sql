@@ -33,6 +33,7 @@ create table if not exists player_profile (
   community_id    uuid not null references community(id) on delete cascade,
   name            text not null,
   level           text check (level in ('newbie','beginner','intermediate','advanced')),
+  gender          text check (gender in ('male','female')),
   sessions_played int not null default 0,
   created_at      timestamptz not null default now(),
   updated_at      timestamptz not null default now()
@@ -65,6 +66,7 @@ create table if not exists session_player (
   profile_id            uuid references player_profile(id) on delete set null,
   name                  text not null,
   level                 text check (level in ('newbie','beginner','intermediate','advanced')),
+  gender                text check (gender in ('male','female')),
   status                text not null default 'registered'
                         check (status in ('registered','active','resting','left')),
   checked_in_at         timestamptz,

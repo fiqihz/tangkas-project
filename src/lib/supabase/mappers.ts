@@ -9,6 +9,7 @@ export function toSessionPlayer(row: DbSessionPlayer): SessionPlayer {
     id: row.id,
     name: row.name,
     level: row.level,
+    gender: row.gender,
     status: row.status,
     checkedInAt: row.checked_in_at,
     gamesPlayed: row.games_played,

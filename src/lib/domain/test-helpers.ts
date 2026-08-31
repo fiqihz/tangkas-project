@@ -13,6 +13,7 @@ export function makePlayer(
     id: overrides.id ?? `p${counter}`,
     name,
     level,
+    gender: null,
     status: "active",
     gamesPlayed: 0,
     lastPlayedRound: null,

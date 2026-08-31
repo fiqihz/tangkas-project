@@ -1,7 +1,7 @@
 "use client";
 
 import { useCallback, useEffect, useState } from "react";
-import type { Level } from "@/lib/domain/types";
+import type { Gender, Level } from "@/lib/domain/types";
 import * as repo from "@/lib/supabase/repo";
 import type { DbPlayerProfile } from "@/lib/supabase/types";
 
@@ -30,8 +30,8 @@ export function useProfiles() {
   }, [load]);
 
   const create = useCallback(
-    async (name: string, level: Level | null) => {
-      const created = await repo.createProfile(name, level);
+    async (name: string, level: Level | null, gender: Gender | null = null) => {
+      const created = await repo.createProfile(name, level, gender);
       await load();
       return created;
     },
@@ -39,7 +39,10 @@ export function useProfiles() {
   );
 
   const update = useCallback(
-    async (id: string, patch: { name?: string; level?: Level | null }) => {
+    async (
+      id: string,
+      patch: { name?: string; level?: Level | null; gender?: Gender | null },
+    ) => {
       await repo.updateProfile(id, patch);
       await load();
     },

@@ -10,7 +10,7 @@ import { LevelBadge } from "@/components/ui/level-badge";
 import { Fab } from "@/components/ui/fab";
 import { Sheet, SheetContent, SheetTitle } from "@/components/ui/sheet";
 import { Toast } from "@/components/ui/toast";
-import type { Match, SessionPlayer } from "@/lib/domain/types";
+import type { Match, MatchMode, SessionPlayer } from "@/lib/domain/types";
 import { useSessionStore } from "@/lib/store/session-store";
 import { haptic } from "@/lib/haptics";
 import { cn } from "@/lib/utils";
@@ -32,6 +32,8 @@ export function CourtsScreen() {
     generateLockedPreview,
   } = useSessionStore();
   const [autoFillMsg, setAutoFillMsg] = useState<string | null>(null);
+  // Lapangan yang sedang memilih mode Auto-fill (null = sheet tertutup).
+  const [modeForCourt, setModeForCourt] = useState<string | null>(null);
 
   const [finishFor, setFinishFor] = useState<Match | null>(null);
   const [manualFor, setManualFor] = useState<string | null>(null);
@@ -136,12 +138,9 @@ export function CourtsScreen() {
                       matchNumber={courtMatchNumber(court.id, primary.id)}
                       byId={byId}
                       hasPreview={!!lockedPreview}
-                      onAutoFill={async () => {
+                      onAutoFill={() => {
                         haptic(12);
-                        const res = await generateLockedPreview(court.id);
-                        if (!res.ok)
-                          setAutoFillMsg(res.reason ?? "Gagal menyusun preview.");
-                        else setAutoFillMsg(null);
+                        setModeForCourt(court.id);
                       }}
                       onFinish={() => {
                         haptic(12);
@@ -214,6 +213,19 @@ export function CourtsScreen() {
           match={playerAction.match}
           player={byId.get(playerAction.playerId)!}
           onClose={() => setPlayerAction(null)}
+        />
+      )}
+      {modeForCourt && (
+        <ModePickerSheet
+          onClose={() => setModeForCourt(null)}
+          onPick={async (mode) => {
+            const courtId = modeForCourt;
+            setModeForCourt(null);
+            const res = await generateLockedPreview(courtId, mode);
+            if (!res.ok)
+              setAutoFillMsg(res.reason ?? "Gagal menyusun preview.");
+            else setAutoFillMsg(null);
+          }}
         />
       )}
 
@@ -419,6 +431,84 @@ function LockedPreview({
   );
 }
 
+
+const MODE_OPTIONS: {
+  value: MatchMode;
+  label: string;
+  desc: string;
+  emoji: string;
+}[] = [
+  {
+    value: "balanced",
+    label: "Seimbang",
+    emoji: "⚖️",
+    desc: "Default. Susun tim seimbang, minimalkan selisih level.",
+  },
+  {
+    value: "mixed",
+    label: "Campuran",
+    emoji: "👫",
+    desc: "Ganda campuran: tiap tim 1 cowok + 1 cewek (best-effort).",
+  },
+  {
+    value: "ladies",
+    label: "Ganda Putri",
+    emoji: "👩",
+    desc: "Semua pemain cewek. Aturan Newbie+Newbie dilonggarkan.",
+  },
+  {
+    value: "gendongan",
+    label: "Gendongan",
+    emoji: "🤝",
+    desc: "Tiap tim 1 kuat + 1 lemah, dua tim dibuat seimbang.",
+  },
+  {
+    value: "kelas",
+    label: "Sesuai Kelas",
+    emoji: "🎯",
+    desc: "Pasangkan pemain dengan level yang sama.",
+  },
+];
+
+function ModePickerSheet({
+  onPick,
+  onClose,
+}: {
+  onPick: (mode: MatchMode) => void;
+  onClose: () => void;
+}) {
+  return (
+    <Sheet open onOpenChange={(o) => !o && onClose()}>
+      <SheetContent>
+        <SheetTitle className="text-lg font-bold">Pilih Mode Match</SheetTitle>
+        <p className="mt-1 text-sm text-muted-foreground">
+          Mode menentukan cara pemain disusun untuk preview berikutnya.
+        </p>
+        <div className="mt-4 flex flex-col gap-2">
+          {MODE_OPTIONS.map((m) => (
+            <button
+              key={m.value}
+              onClick={() => {
+                haptic(12);
+                onPick(m.value);
+              }}
+              className="flex select-none items-start gap-3 rounded-xl border border-border bg-secondary/40 px-3.5 py-3 text-left transition-all active:scale-[0.99] active:bg-secondary"
+            >
+              <span className="text-xl leading-none">{m.emoji}</span>
+              <span className="flex min-w-0 flex-col gap-0.5">
+                <span className="font-semibold">{m.label}</span>
+                <span className="text-xs text-muted-foreground">{m.desc}</span>
+              </span>
+            </button>
+          ))}
+          <Button variant="outline" className="mt-1" onClick={onClose}>
+            Batal
+          </Button>
+        </div>
+      </SheetContent>
+    </Sheet>
+  );
+}
 
 function RenameCourtDialog({
   initialLabel,

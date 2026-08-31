@@ -5,6 +5,17 @@
 /** Level pemain — ditentukan manual oleh host (tidak ada promosi otomatis). */
 export type Level = "newbie" | "beginner" | "intermediate" | "advanced";
 
+/** Gender pemain — untuk mode match campuran & ganda putri. */
+export type Gender = "male" | "female";
+
+/** Mode pembentukan match, dipilih host saat Auto-fill. */
+export type MatchMode =
+  | "balanced" // minimalkan selisih level (default, existing)
+  | "mixed" // ganda campuran: tiap tim 1 cowok + 1 cewek (best-effort)
+  | "ladies" // ganda putri: 4 pemain cewek (relax hard rule Newbie)
+  | "gendongan" // tiap tim 1 kuat + 1 lemah, 2 tim seimbang
+  | "kelas"; // pasangkan sesama level
+
 /** Status pemain dalam satu sesi mabar. */
 export type PlayerStatus =
   | "registered" // sudah didaftarkan, belum tentu datang
@@ -20,6 +31,7 @@ export interface PlayerProfile {
   id: string;
   name: string;
   level: Level | null;
+  gender: Gender | null;
 }
 
 /**
@@ -30,6 +42,7 @@ export interface SessionPlayer {
   id: string;
   name: string;
   level: Level | null;
+  gender: Gender | null;
   status: PlayerStatus;
   /** Waktu pertama kali check-in (ISO) — untuk sort urutan kedatangan. */
   checkedInAt?: string | null;

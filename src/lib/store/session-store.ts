@@ -8,6 +8,7 @@ import { findSubstitute } from "@/lib/domain/substitute";
 import type {
   Level,
   Match,
+  MatchMode,
   PlayerStatus,
   SessionPlayer,
 } from "@/lib/domain/types";
@@ -50,6 +51,7 @@ interface SessionState {
   addPlayer: (p: {
     name: string;
     level: Level | null;
+    gender?: "male" | "female" | null;
     profileId?: string | null;
     status?: PlayerStatus;
   }) => Promise<void>;
@@ -75,7 +77,9 @@ interface SessionState {
   proposedMatchByCourt: (courtId: string) => Match | undefined;
   generateLockedPreview: (
     courtId: string | null,
+    mode?: MatchMode,
   ) => Promise<{ ok: boolean; reason?: string }>;
+  setPlayerGender: (playerId: string, gender: "male" | "female") => Promise<void>;
   editProposedPlayer: (
     matchId: string,
     outId: string,
@@ -324,6 +328,25 @@ export const useSessionStore = create<SessionState>((set, get) => ({
     await get().refresh();
   },
 
+  async setPlayerGender(playerId, gender) {
+    const { players, profileIdOf } = get();
+    const player = players.find((p) => p.id === playerId);
+    await repo.updateSessionPlayer(playerId, { gender });
+    // Sinkron ke roster agar persisten lintas mabar.
+    const profileId = profileIdOf[playerId] ?? null;
+    if (profileId) {
+      await repo.updateProfile(profileId, { gender });
+    } else if (player) {
+      try {
+        const created = await repo.createProfile(player.name, player.level, gender);
+        await repo.linkSessionPlayerProfile(playerId, created.id);
+      } catch {
+        // abaikan bila nama sudah ada di roster
+      }
+    }
+    await get().refresh();
+  },
+
   async setPlayerStatus(playerId, status) {
     const { session, players } = get();
     if (!session) return;
@@ -473,7 +496,7 @@ export const useSessionStore = create<SessionState>((set, get) => ({
    * saling eksklusif dengan proposed/playing lapangan lain. Tidak menimpa bila
    * sudah ada proposed di lapangan itu.
    */
-  async generateLockedPreview(courtId) {
+  async generateLockedPreview(courtId, mode = "balanced") {
     const { session, matches, players, courts } = get();
     if (!session || !courtId) return { ok: false };
 
@@ -505,13 +528,19 @@ export const useSessionStore = create<SessionState>((set, get) => ({
     }
 
     const round = session.current_round + 1;
-    const prop = generateMatch(pool, history, round);
-    if (!prop)
-      return {
-        ok: false,
-        reason:
+    const prop = generateMatch(pool, history, round, undefined, mode);
+    if (!prop) {
+      const modeReason: Record<string, string> = {
+        mixed: "Tidak bisa ganda campuran — komposisi cowok/cewek belum cukup.",
+        ladies: "Tidak bisa ganda putri — pemain wanita tersedia kurang dari 4.",
+        gendongan:
+          "Tidak bisa gendongan — butuh kombinasi pemain kuat & lemah yang pas.",
+        kelas: "Tidak bisa sesuai kelas — level pemain tersedia tidak cocok.",
+        balanced:
           "Tidak ada kombinasi valid dari pemain tersedia (cek aturan level Newbie).",
       };
+      return { ok: false, reason: modeReason[mode] ?? modeReason.balanced };
+    }
 
     const courtLabel = courts.find((c) => c.id === courtId)?.label ?? null;
     await repo.createMatch({

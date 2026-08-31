@@ -2,8 +2,10 @@
 
 Dokumen acuan resmi untuk aplikasi **TangkasBoard**. Merefleksikan kondisi
 implementasi terkini (Batch A–F selesai, plus preview terkunci yang bisa
-diedit & toleransi keseimbangan Advanced). Batch G (gender + rotasi per-ronde)
-masih ditunda — lihat `.kiro/steering/batch-g-gender-rotation.md`.
+diedit & toleransi keseimbangan Advanced). **Batch G (gender + mode match
+dipilih host saat Auto-fill) sudah diimplementasi** di branch
+`batch-g-gender-mode` (lihat §16) — detail rancangan di
+`.kiro/steering/batch-g-gender-rotation.md`.
 
 ---
 
@@ -42,6 +44,7 @@ Bentuk: **PWA** mobile-first, di-hosting gratis.
 - Bobot: **Newbie=1, Beginner=2, Intermediate=3, Advanced=4**
 - Level di-set manual oleh host, bisa diedit kapan saja (termasuk dari popup pemain di lapangan).
 - Level tersimpan permanen di **roster** (`player_profile`) → tidak perlu observasi ulang di mabar berikutnya.
+- **Gender** (`male` | `female` | `null`): di-set manual (opsional, bisa `null` bila belum ketahuan saat daftar). Dipakai untuk mode match Campuran & Ganda Putri (lihat §16). Tersimpan di roster & session_player, mirip level.
 
 ### Hard rule (berlaku di semua matchmaking)
 - **Newbie TIDAK boleh setim dengan Newbie**, dan tidak boleh format Newbie/Newbie vs Newbie/Newbie.
@@ -182,7 +185,7 @@ Multi-tenant sejak awal (untuk jalan ke Opsi C):
 
 RLS aktif dengan policy permisif untuk anon (sesuai Opsi B — gembok di app). Realtime aktif di `match`, `session_player`, `court`.
 
-Migrations (di `supabase/migrations/`): `001` sessions_played, `002` match state unfinished, `003` multi-status sesi, `004` match court_label, `005` checked_in_at.
+Migrations (di `supabase/migrations/`): `001` sessions_played, `002` match state unfinished, `003` multi-status sesi, `004` match court_label, `005` checked_in_at, `006` gender (kolom `gender` di `player_profile` & `session_player`).
 
 ---
 
@@ -200,16 +203,60 @@ Migrations (di `supabase/migrations/`): `001` sessions_played, `002` match state
 ## 14. Logika Inti (`src/lib/domain/`, teruji)
 
 - Bobot level & keseimbangan tim (`rules.ts`)
-- Matchmaking (hard rule + skor berbobot + anti-repeat + penalti baru-main) (`matchmaking.ts`)
+- Matchmaking (hard rule + skor berbobot + anti-repeat + penalti baru-main + **mode match**) (`matchmaking.ts`)
+- Mode match & validasi matchup per mode (`isStrong`, `isValidMatchupForMode`) (`rules.ts`)
 - Antrian jatah main (`queue.ts`)
 - History anti-repeat partner/lawan (`history.ts`)
 - Pengganti/substitusi (`substitute.ts`)
 - Akumulasi skor, bonus tertinggal, win rate, tie-break (`leaderboard.ts`)
-- Tes: `domain.test.ts`, `rotation.test.ts` (15 tes).
+- Tes: `domain.test.ts`, `rotation.test.ts`, `modes.test.ts` (**23 tes**).
 
 ---
 
 ## 15. Roadmap (belum dikerjakan)
 
-- **Batch G**: gender + rotasi per-ronde (mixed → gendongan → kelas). Detail di `.kiro/steering/batch-g-gender-rotation.md`.
 - **Opsi C**: Supabase Auth + multi-komunitas + role admin/member (host bisa dialihkan). Skema sudah multi-tenant, tinggal tambah auth + perketat RLS.
+
+---
+
+## 16. Batch G — Gender + Mode Match (host pilih saat Auto-fill)
+
+Status: **diimplementasi** di branch `batch-g-gender-mode` (belum merge ke `main`;
+menunggu review host lewat Vercel preview). Berbeda dari rancangan awal
+"rotasi per-ronde otomatis" (di steering doc): keputusan final adalah **host yang
+memilih mode** saat menekan Auto-fill — bukan siklus otomatis per ronde. Alasan:
+tiap lapangan berjalan independen (Batch A), jadi "ronde ke-N = mode X" otomatis
+akan bentrok dan kaku.
+
+### Gender
+- Field `gender`: `male` | `female` | `null` (nullable — saat daftar pertama sering belum ketahuan).
+- Di-set/-edit dari dialog **Tambah Pemain (Pemain Baru)** dan dari **popup aksi pemain** (section "Set gender").
+- Badge gender kecil (♂/♀) tampil di list roster.
+- Disinkron ke roster (`player_profile`) agar persisten lintas mabar.
+
+### Alur pemilihan mode
+Tap **Auto-fill** (per lapangan) → muncul **sheet pilih mode** (5 pilihan + penjelasan
+singkat) → pilih mode → `generateLockedPreview(courtId, mode)` menyusun preview
+`proposed`. Bila best-effort tidak terpenuhi, tampil **toast** alasan spesifik per mode.
+
+### 5 Mode
+| Mode | Value | Aturan |
+|---|---|---|
+| **Seimbang** | `balanced` | Default (existing). Minimalkan selisih bobot antar tim. |
+| **Campuran** | `mixed` | Ganda campuran: tiap tim 1 cowok + 1 cewek (best-effort). |
+| **Ganda Putri** | `ladies` | Semua pemain cewek. **Hard rule Newbie+Newbie dilonggarkan** (Opsi B) karena pool cewek bisa kecil. |
+| **Gendongan** | `gendongan` | Tiap tim 1 kuat (Intermediate/Advanced) + 1 lemah (Newbie/Beginner), dua tim dibuat seimbang. |
+| **Sesuai Kelas** | `kelas` | Pasangkan pemain dengan level sama. |
+
+Catatan:
+- Hanya Campuran + Ganda Putri untuk gender (Ganda Putra tidak dibuat — mayoritas pemain cowok).
+- Untuk mode non-balanced, window kandidat pool diperlebar (14) agar lebih mudah menemukan komposisi yang cocok.
+- Hard rule Newbie+Newbie **tetap** berlaku di semua mode **kecuali** Ganda Putri (relax).
+
+### Implementasi teknis
+- `types.ts`: tipe `Gender`, `MatchMode`; field `gender` di `PlayerProfile`/`SessionPlayer`.
+- `rules.ts`: `isStrong`, `isValidMatchupForMode`.
+- `matchmaking.ts`: `generateMatch(..., mode)` + scoring per mode.
+- `session-store.ts`: `generateLockedPreview(courtId, mode)`, `setPlayerGender`, `addPlayer` terima gender.
+- UI: `gender-select.tsx` (`GenderSelect`+`GenderBadge`), `ModePickerSheet` di `courts-screen.tsx`.
+- DB: migration `006_gender.sql` — **harus dijalankan di Supabase sebelum tes gender**.

@@ -38,11 +38,12 @@ export async function listProfiles(
 export async function createProfile(
   name: string,
   level: Level | null,
+  gender: "male" | "female" | null = null,
   communityId = DEFAULT_COMMUNITY_ID,
 ): Promise<DbPlayerProfile> {
   const { data, error } = await db()
     .from("player_profile")
-    .insert({ name, level, community_id: communityId })
+    .insert({ name, level, gender, community_id: communityId })
     .select("*")
     .single();
   if (error) throw error;
@@ -51,7 +52,7 @@ export async function createProfile(
 
 export async function updateProfile(
   id: string,
-  patch: Partial<Pick<DbPlayerProfile, "name" | "level">>,
+  patch: Partial<Pick<DbPlayerProfile, "name" | "level" | "gender">>,
 ): Promise<void> {
   const { error } = await db()
     .from("player_profile")
@@ -284,6 +285,7 @@ export async function addSessionPlayer(
   player: {
     name: string;
     level: Level | null;
+    gender?: "male" | "female" | null;
     profileId?: string | null;
     status?: PlayerStatus;
   },
@@ -295,6 +297,7 @@ export async function addSessionPlayer(
       profile_id: player.profileId ?? null,
       name: player.name,
       level: player.level,
+      gender: player.gender ?? null,
       status: player.status ?? "registered",
     })
     .select("*")
@@ -320,6 +323,7 @@ export async function updateSessionPlayer(
     Pick<
       DbSessionPlayer,
       | "level"
+      | "gender"
       | "status"
       | "checked_in_at"
       | "games_played"

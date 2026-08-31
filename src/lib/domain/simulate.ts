@@ -15,6 +15,7 @@ function mk(name: string, level: Level): SessionPlayer {
     id: `p${idc}`,
     name,
     level,
+    gender: null,
     status: "active",
     gamesPlayed: 0,
     lastPlayedRound: null,

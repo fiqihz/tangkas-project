@@ -6,9 +6,10 @@ import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { LevelBadge } from "@/components/ui/level-badge";
 import { LevelSelect } from "@/components/ui/level-select";
+import { GenderSelect, GenderBadge } from "@/components/ui/gender-select";
 import { Sheet, SheetContent, SheetTitle } from "@/components/ui/sheet";
 import { haptic } from "@/lib/haptics";
-import type { Level } from "@/lib/domain/types";
+import type { Gender, Level } from "@/lib/domain/types";
 import { useSessionStore } from "@/lib/store/session-store";
 import { useProfiles } from "@/lib/store/use-profiles";
 import type { DbPlayerProfile } from "@/lib/supabase/types";
@@ -57,15 +58,21 @@ export function AddPlayerDialog({
         ) : (
           <NewPlayerTab
             existingNames={existingNames}
-            onCreate={async (name, level) => {
+            onCreate={async (name, level, gender) => {
               let profileId: string | null = null;
               try {
-                const created = await createProfile(name, level);
+                const created = await createProfile(name, level, gender);
                 profileId = created.id;
               } catch {
                 // nama mungkin sudah ada di roster — tetap tambah ke sesi
               }
-              await addPlayer({ name, level, profileId, status: "registered" });
+              await addPlayer({
+                name,
+                level,
+                gender,
+                profileId,
+                status: "registered",
+              });
             }}
             onClose={onClose}
           />
@@ -210,7 +217,9 @@ function RosterTab({
                   {picked && <Check size={14} />}
                 </span>
                 <div className="min-w-0">
-                  <div className="truncate font-medium">{p.name}</div>
+                  <div className="flex items-center gap-1.5 truncate font-medium">
+                    {p.name} <GenderBadge gender={p.gender} />
+                  </div>
                   <div className="text-xs text-muted-foreground">
                     🏸 {p.sessions_played}x mabar
                   </div>
@@ -243,11 +252,16 @@ function NewPlayerTab({
   onClose,
 }: {
   existingNames: Set<string>;
-  onCreate: (name: string, level: Level | null) => Promise<void>;
+  onCreate: (
+    name: string,
+    level: Level | null,
+    gender: Gender | null,
+  ) => Promise<void>;
   onClose: () => void;
 }) {
   const [name, setName] = useState("");
   const [level, setLevel] = useState<Level | null>(null);
+  const [gender, setGender] = useState<Gender | null>(null);
   const [saving, setSaving] = useState(false);
 
   const dup = existingNames.has(name.trim().toLowerCase());
@@ -257,7 +271,7 @@ function NewPlayerTab({
     if (!canSave) return;
     haptic(15);
     setSaving(true);
-    await onCreate(name.trim(), level);
+    await onCreate(name.trim(), level, gender);
     setSaving(false);
     onClose();
   };
@@ -284,6 +298,13 @@ function NewPlayerTab({
           Level (opsional — bisa di-set nanti saat observasi)
         </div>
         <LevelSelect value={level} onChange={setLevel} size="sm" />
+      </div>
+
+      <div>
+        <div className="mb-1 text-xs text-muted-foreground">
+          Gender (opsional — untuk mode campuran & ganda putri)
+        </div>
+        <GenderSelect value={gender} onChange={setGender} size="sm" />
       </div>
 
       <Button size="lg" onClick={save} disabled={!canSave || saving}>
