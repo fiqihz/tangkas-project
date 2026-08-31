@@ -1,7 +1,8 @@
 # TangkasBoard — Design & Agreement Document
 
 Dokumen acuan resmi untuk aplikasi **TangkasBoard**. Merefleksikan kondisi
-implementasi terkini (Batch A–F selesai). Batch G (gender + rotasi per-ronde)
+implementasi terkini (Batch A–F selesai, plus preview terkunci yang bisa
+diedit & toleransi keseimbangan Advanced). Batch G (gender + rotasi per-ronde)
 masih ditunda — lihat `.kiro/steering/batch-g-gender-rotation.md`.
 
 ---
@@ -69,7 +70,7 @@ Daftar pemain **Active** diurutkan berdasarkan **waktu check-in** (`checked_in_a
 2. Dahulukan pemain dengan **jatah main paling sedikit** (`gamesPlayed` terendah).
 3. Dahulukan yang **paling lama menunggu**.
 4. Hindari pemain yang **baru selesai main** (penalti, biar sempat istirahat).
-5. Minimalkan **selisih bobot** antar tim (fairness).
+5. Minimalkan **selisih bobot** antar tim (fairness), dengan **toleransi ≤2** (lihat §6).
 6. Minimalkan **pengulangan** partner & lawan (anti "ketemu itu-itu terus").
 
 Faktor digabung jadi skor berbobot (config di `src/lib/domain/types.ts` → `DEFAULT_CONFIG`).
@@ -110,10 +111,11 @@ Bottom sheet dengan konfirmasi eksplisit (aman dari accidental touch):
 1. **Set Level** (selector, selalu tersedia — untuk observasi cepat).
 2. **Istirahatkan (pengganti otomatis)** → pemain jadi `resting`, sistem cari pengganti.
 3. **Istirahatkan — pilih pengganti** → pemain jadi `resting`, host pilih manual.
-4. **Ganti / tukar pemain** → pemain kembali ke antrian (`active`). Pilih pengganti:
+4. **Ganti / tukar pemain** (selalu tersedia) → pemain kembali ke antrian (`active`). Pilih pengganti:
    - **Replace** dengan pemain menunggu, atau
-   - **Swap** dengan pemain yang sedang main di lapangan lain (dua match ter-update).
-   - Selalu tampil section **⭐ Disarankan** (kandidat terbaik) + **Semua tersedia** (dengan search) + **Tukar dengan yang sedang main**.
+   - **Swap posisi di lapangan ini** (tukar antar 4 pemain di match yang sama, mis. lawan jadi partner), atau
+   - **Swap dengan pemain yang sedang main di lapangan lain** (dua match ter-update).
+   - Section: **⭐ Disarankan** + **Semua tersedia** (search) + **Tukar posisi di lapangan ini** + **Tukar dengan yang sedang main (lapangan lain)**.
 5. **Batal**.
 
 Semua penggantian tetap patuh hard rule (Newbie+Newbie ditolak).
@@ -185,7 +187,7 @@ Migrations (di `supabase/migrations/`): `001` sessions_played, `002` match state
 
 - **Daftar Mabar** (main page): list sesi + buat/kelola.
 - **Pemain**: tambah (dari roster searchable / pemain baru), search, check-in, set level, rest/pulang. FAB + Pemain.
-- **Lapangan**: kartu per lapangan (proposed/playing), Mulai Main / Finish, preview next-4, popup aksi pemain, tambah/hapus/rename lapangan.
+- **Lapangan**: kartu per lapangan (proposed/playing), Mulai Main / Finish, preview terkunci yang bisa diedit (tap pemain), popup aksi pemain, tambah/hapus/rename lapangan.
 - **Skor**: livescore leaderboard.
 - **History**: match per lapangan + edit skor.
 - **Selesai**: SELESAI MABAR → Hasil Akhir (podium).
