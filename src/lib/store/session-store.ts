@@ -530,15 +530,35 @@ export const useSessionStore = create<SessionState>((set, get) => ({
     const round = session.current_round + 1;
     const prop = generateMatch(pool, history, round, undefined, mode);
     if (!prop) {
+      // Kasus dead-end paling umum di mode non-ladies: sisa pool kebanyakan
+      // Newbie. Tiap Newbie butuh 1 partner non-Newbie (Newbie+Newbie dilarang),
+      // jadi butuh minimal jumlah non-Newbie >= jumlah Newbie.
+      const newbieCount = pool.filter((p) => p.level === "newbie").length;
+      const nonNewbieCount = pool.length - newbieCount;
+      const newbieDeadEnd =
+        mode !== "ladies" && newbieCount > nonNewbieCount;
+
       const modeReason: Record<string, string> = {
-        mixed: "Tidak bisa ganda campuran — komposisi cowok/cewek belum cukup.",
+        mixed:
+          "Tidak bisa ganda campuran — komposisi cowok/cewek dari pemain tersedia belum cukup (tiap tim butuh 1 cowok + 1 cewek).",
         ladies: "Tidak bisa ganda putri — pemain wanita tersedia kurang dari 4.",
         gendongan:
-          "Tidak bisa gendongan — butuh kombinasi pemain kuat & lemah yang pas.",
+          "Tidak bisa gendongan — butuh kombinasi pemain kuat (Int/Adv) & lemah (New/Beg) yang pas.",
         kelas: "Tidak bisa sesuai kelas — level pemain tersedia tidak cocok.",
         balanced:
           "Tidak ada kombinasi valid dari pemain tersedia (cek aturan level Newbie).",
       };
+
+      if (newbieDeadEnd) {
+        return {
+          ok: false,
+          reason:
+            `Sisa pemain: ${newbieCount} Newbie + ${nonNewbieCount} non-Newbie. ` +
+            `Newbie tidak boleh setim sesama Newbie, jadi butuh minimal ${newbieCount} ` +
+            `pemain non-Newbie. Tunggu match lain selesai atau ratakan Newbie lewat edit preview/isi manual.`,
+        };
+      }
+
       return { ok: false, reason: modeReason[mode] ?? modeReason.balanced };
     }
 
