@@ -55,11 +55,23 @@ export function AppShell() {
 function AppShellContent() {
   const { session, loadSessions, backToList, finishedResult } =
     useSessionStore();
+  const subscribeRealtime = useSessionStore((s) => s.subscribeRealtime);
+  const unsubscribeRealtime = useSessionStore((s) => s.unsubscribeRealtime);
   const [tab, setTab] = useState<Tab>("courts");
 
   useEffect(() => {
     void loadSessions();
   }, [loadSessions]);
+
+  // Realtime multi-device: saat sebuah sesi terbuka, langganan perubahan
+  // (match/pemain/lapangan/sesi) agar aksi dari device lain langsung tampil.
+  // Cleanup saat sesi berganti atau komponen unmount agar tidak bocor.
+  const sessionId = session?.id ?? null;
+  useEffect(() => {
+    if (!sessionId) return;
+    subscribeRealtime(sessionId);
+    return () => unsubscribeRealtime();
+  }, [sessionId, subscribeRealtime, unsubscribeRealtime]);
 
   // Halaman hasil akhir setelah SELESAI MABAR (sebelum kembali ke list)
   if (finishedResult) {

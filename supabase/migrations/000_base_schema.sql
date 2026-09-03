@@ -170,17 +170,4 @@ begin
     alter publication supabase_realtime add table court;
   exception when others then null;
   end;
-  begin
-    alter publication supabase_realtime add table session;
-  exception when others then null;
-  end;
 end $$;
-
--- REPLICA IDENTITY FULL: wajib agar langganan realtime BERFILTER
--- (session_id=eq.<id> / id=eq.<id>) mengirim semua kolom ke stream replikasi,
--- sehingga filter bisa dievaluasi untuk INSERT/UPDATE/DELETE. Tanpa ini,
--- langganan berfilter bisa "SUBSCRIBED" tapi event tidak pernah terkirim.
-alter table match          replica identity full;
-alter table session_player replica identity full;
-alter table court          replica identity full;
-alter table session        replica identity full;

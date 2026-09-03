@@ -39,6 +39,10 @@ interface SessionState {
   loadSessions: () => Promise<void>;
   openSession: (sessionId: string) => Promise<void>;
   backToList: () => void;
+  /** Mulai langganan realtime untuk sesi aktif (dipanggil dari AppShell). */
+  subscribeRealtime: (sessionId: string) => void;
+  /** Hentikan langganan realtime (cleanup saat unmount / ganti sesi). */
+  unsubscribeRealtime: () => void;
   createSession: (opts: {
     name: string;
     courts: number;
@@ -145,6 +149,14 @@ function byIdMap(players: SessionPlayer[]) {
  */
 const inFlight = new Set<string>();
 
+// --- Realtime (level modul; bukan state React) ---------------------------
+/** Fungsi untuk menghentikan langganan realtime yang sedang aktif. */
+let realtimeUnsub: (() => void) | null = null;
+/** Id sesi yang sedang dilanggan (cegah langganan ganda ke sesi sama). */
+let realtimeSessionId: string | null = null;
+/** Timer debounce agar burst event realtime tidak memicu banyak refresh. */
+let realtimeDebounce: ReturnType<typeof setTimeout> | null = null;
+
 export const useSessionStore = create<SessionState>((set, get) => ({
   loading: true,
   sessions: [],
@@ -198,19 +210,59 @@ export const useSessionStore = create<SessionState>((set, get) => ({
   },
 
   backToList() {
+    get().unsubscribeRealtime();
     set({ session: null, courts: [], players: [], matches: [], profileIdOf: {} });
     void get().loadSessions();
+  },
+
+  subscribeRealtime(sessionId) {
+    // Sudah dilanggan ke sesi yang sama -> jangan buat channel ganda.
+    if (realtimeSessionId === sessionId && realtimeUnsub) return;
+    // Ganti sesi -> tutup langganan lama dulu.
+    get().unsubscribeRealtime();
+
+    realtimeSessionId = sessionId;
+    realtimeUnsub = repo.subscribeToSession(sessionId, () => {
+      // Debounce: satu aksi sering mengubah beberapa baris (mis. finishMatch
+      // menyentuh match + 4 session_player). Kumpulkan burst jadi 1 refresh.
+      if (realtimeDebounce) clearTimeout(realtimeDebounce);
+      realtimeDebounce = setTimeout(() => {
+        realtimeDebounce = null;
+        // Hanya refresh bila masih di sesi yang sama.
+        if (get().session?.id === sessionId) {
+          void get().refresh();
+        }
+      }, 250);
+    });
+  },
+
+  unsubscribeRealtime() {
+    if (realtimeDebounce) {
+      clearTimeout(realtimeDebounce);
+      realtimeDebounce = null;
+    }
+    if (realtimeUnsub) {
+      realtimeUnsub();
+      realtimeUnsub = null;
+    }
+    realtimeSessionId = null;
   },
 
   async refresh() {
     const { session } = get();
     if (!session) return;
-    const [courts, players, matches] = await Promise.all([
+    const [fresh, courts, players, matches] = await Promise.all([
+      // Muat ulang baris session juga agar counter (current_round, courts,
+      // status) ikut sinkron di device pengamat saat realtime memicu refresh.
+      repo.getSession(session.id),
       repo.listCourts(session.id),
       repo.listSessionPlayers(session.id),
       repo.listMatches(session.id),
     ]);
     set({
+      // Pertahankan session lama bila fetch mengembalikan null (mis. terhapus)
+      // agar tidak tiba-tiba menendang user keluar board saat transisi.
+      session: fresh ?? session,
       courts,
       players: players.map(toSessionPlayer),
       matches: matches.map(toMatch),
@@ -302,9 +354,9 @@ export const useSessionStore = create<SessionState>((set, get) => ({
     const { session, players } = get();
     if (!session) return;
     try {
-      // counter "ikut mabar" +1 untuk pemain yang benar-benar main (task #4)
-      await get().incrementSessionsForPlayed();
-      await repo.finishSession(session.id);
+      // Atomik: increment sessions_played (pemain yang main) + set sesi
+      // 'finished' dalam 1 transaksi DB. Idempoten terhadap dobel-panggil.
+      await repo.finishSessionAtomic(session.id);
     } catch (e) {
       // Jangan clear board / tampilkan hasil akhir kalau gagal menyelesaikan —
       // biar host bisa coba lagi tanpa kehilangan konteks sesi.
@@ -530,21 +582,19 @@ export const useSessionStore = create<SessionState>((set, get) => ({
   async setManualMatch(courtId, teamA, teamB) {
     const { session, courts } = get();
     if (!session) return;
-    const round = session.current_round + 1;
     const courtLabel = courts.find((c) => c.id === courtId)?.label ?? null;
     try {
-      // match dibuat sebagai 'proposed' (belum mulai) — host tap "Mulai Main"
-      await repo.createMatch({
+      // Atomik: buat match 'proposed' + naikkan current_round di DB (nomor
+      // ronde dihitung server-side -> tidak bentrok antar device).
+      const created = await repo.createMatchAtomic({
         sessionId: session.id,
         courtId,
         courtLabel,
-        round,
         teamA,
         teamB,
         state: "proposed",
       });
-      await repo.updateSession(session.id, { current_round: round });
-      set({ session: { ...session, current_round: round } });
+      set({ session: { ...session, current_round: created.round } });
       await get().refresh();
     } catch (e) {
       set({ actionError: `Gagal menyusun match: ${describe(e)}.` });
@@ -660,17 +710,17 @@ export const useSessionStore = create<SessionState>((set, get) => ({
 
     const courtLabel = courts.find((c) => c.id === courtId)?.label ?? null;
     try {
-      await repo.createMatch({
+      // Atomik: buat match + naikkan ronde di DB (server-side). Nomor ronde
+      // final berasal dari DB agar tidak bentrok antar device.
+      const created = await repo.createMatchAtomic({
         sessionId: session.id,
         courtId,
         courtLabel,
-        round,
         teamA: prop.teamA,
         teamB: prop.teamB,
         state: "proposed",
       });
-      await repo.updateSession(session.id, { current_round: round });
-      set({ session: { ...session, current_round: round } });
+      set({ session: { ...session, current_round: created.round } });
       await get().refresh();
       return { ok: true };
     } catch (e) {
@@ -690,35 +740,12 @@ export const useSessionStore = create<SessionState>((set, get) => ({
     if (!match) return;
 
     try {
-      await repo.finishMatch(matchId, scoreA, scoreB, winner);
-
-      // update statistik + jatah main pemain
-      const teamA = new Set(match.teamA.playerIds);
-      const teamB = new Set(match.teamB.playerIds);
-      const involved = [...match.teamA.playerIds, ...match.teamB.playerIds];
-      const map = byIdMap(players);
-
-      await Promise.all(
-        involved.map((id) => {
-          const p = map.get(id);
-          if (!p) return Promise.resolve();
-          const inA = teamA.has(id);
-          const scored = inA ? scoreA : scoreB;
-          const conceded = inA ? scoreB : scoreA;
-          const won = (inA && winner === "a") || (teamB.has(id) && winner === "b");
-          const lost = (inA && winner === "b") || (teamB.has(id) && winner === "a");
-          const drew = winner === "draw";
-          return repo.updateSessionPlayer(id, {
-            games_played: p.gamesPlayed + 1,
-            last_played_round: match.round,
-            wins: p.wins + (won ? 1 : 0),
-            losses: p.losses + (lost ? 1 : 0),
-            draws: p.draws + (drew ? 1 : 0),
-            points_scored: p.pointsScored + scored,
-            points_conceded: p.pointsConceded + conceded,
-          });
-        }),
-      );
+      // Atomik: match di-set finished + statistik 4 pemain di-update dalam 1
+      // transaksi DB (server-side), kebal terhadap kegagalan sebagian & race
+      // multi-device. Menggantikan pola lama (update match lalu Promise.all
+      // updateSessionPlayer) yang bisa korup bila gagal di tengah.
+      void players; // stats dihitung di DB; snapshot lokal tak lagi dipakai
+      await repo.finishMatchAtomic(matchId, scoreA, scoreB, winner);
     } catch (e) {
       set({ actionError: `Gagal menyimpan skor: ${describe(e)}. Coba lagi.` });
     }

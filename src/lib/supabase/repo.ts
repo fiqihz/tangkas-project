@@ -435,6 +435,114 @@ export async function finishMatch(
 }
 
 // ---------------------------------------------------------------------------
+// RPC ATOMIK (poin stabilisasi #4) — operasi multi-write dalam 1 transaksi.
+// ---------------------------------------------------------------------------
+/**
+ * Selesaikan match + update statistik 4 pemainnya secara atomik (di DB).
+ * Statistik dihitung server-side dari kolom tim match, jadi kebal terhadap
+ * snapshot client yang basi. Idempoten terhadap retry (match yang sudah
+ * finished tidak diproses ulang).
+ */
+export async function finishMatchAtomic(
+  matchId: string,
+  scoreA: number,
+  scoreB: number,
+  winner: "a" | "b" | "draw",
+): Promise<void> {
+  const { error } = await db().rpc("finish_match_atomic", {
+    p_match_id: matchId,
+    p_score_a: scoreA,
+    p_score_b: scoreB,
+    p_winner: winner,
+  });
+  if (error) throw error;
+}
+
+/**
+ * Buat match 'proposed' + naikkan current_round secara atomik. Nomor ronde
+ * dihitung di DB sehingga dua device tidak bentrok nomor ronde.
+ */
+export async function createMatchAtomic(match: {
+  sessionId: string;
+  courtId: string | null;
+  courtLabel?: string | null;
+  teamA: [string, string];
+  teamB: [string, string];
+  state?: "proposed" | "playing";
+}): Promise<DbMatch> {
+  const { data, error } = await db().rpc("create_match_atomic", {
+    p_session_id: match.sessionId,
+    p_court_id: match.courtId,
+    p_court_label: match.courtLabel ?? null,
+    p_team_a_p1: match.teamA[0],
+    p_team_a_p2: match.teamA[1],
+    p_team_b_p1: match.teamB[0],
+    p_team_b_p2: match.teamB[1],
+    p_state: match.state ?? "proposed",
+  });
+  if (error) throw error;
+  return data as DbMatch;
+}
+
+/**
+ * Selesaikan sesi + increment sessions_played untuk pemain yang benar-benar
+ * main, secara atomik. Idempoten (sesi yang sudah finished tidak diproses ulang).
+ */
+export async function finishSessionAtomic(sessionId: string): Promise<void> {
+  const { error } = await db().rpc("finish_session_atomic", {
+    p_session_id: sessionId,
+  });
+  if (error) throw error;
+}
+
+// ---------------------------------------------------------------------------
+// REALTIME (livescore multi-device)
+// ---------------------------------------------------------------------------
+/**
+ * Berlangganan perubahan realtime untuk satu sesi. Memantau tabel match,
+ * session_player, dan court (difilter per session_id) plus baris session itu
+ * sendiri. Setiap ada INSERT/UPDATE/DELETE, `onChange` dipanggil — pemanggil
+ * (store) lalu melakukan refresh() agar semua device tetap sinkron.
+ *
+ * Mengembalikan fungsi unsubscribe; WAJIB dipanggil saat unmount / ganti sesi
+ * agar tidak terjadi kebocoran channel atau langganan ganda.
+ */
+export function subscribeToSession(
+  sessionId: string,
+  onChange: () => void,
+): () => void {
+  const supabase = db();
+  const channel = supabase
+    .channel(`session:${sessionId}`)
+    .on(
+      "postgres_changes",
+      { event: "*", schema: "public", table: "match", filter: `session_id=eq.${sessionId}` },
+      onChange,
+    )
+    .on(
+      "postgres_changes",
+      { event: "*", schema: "public", table: "session_player", filter: `session_id=eq.${sessionId}` },
+      onChange,
+    )
+    .on(
+      "postgres_changes",
+      { event: "*", schema: "public", table: "court", filter: `session_id=eq.${sessionId}` },
+      onChange,
+    )
+    .on(
+      "postgres_changes",
+      { event: "*", schema: "public", table: "session", filter: `id=eq.${sessionId}` },
+      onChange,
+    )
+    .subscribe();
+
+  return () => {
+    // removeChannel juga meng-unsubscribe channel-nya.
+    void supabase.removeChannel(channel);
+  };
+}
+
+// ---------------------------------------------------------------------------
 // Helper konversi ke domain (dipakai UI)
 // ---------------------------------------------------------------------------
 export { toMatch, toSessionPlayer };
