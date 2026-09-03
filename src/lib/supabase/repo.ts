@@ -393,6 +393,27 @@ export async function updateMatchState(
   if (error) throw error;
 }
 
+/**
+ * Mulai match: set state 'playing' + catat started_at=now() (untuk timer
+ * durasi). Hanya set started_at bila belum ada, agar re-start tidak mereset
+ * timer secara tak sengaja.
+ */
+export async function startMatchPlaying(matchId: string): Promise<void> {
+  const { error } = await db()
+    .from("match")
+    .update({ state: "playing", started_at: new Date().toISOString() })
+    .eq("id", matchId)
+    .is("started_at", null);
+  if (error) throw error;
+  // Bila started_at sudah terisi (filter .is null tidak match), tetap pastikan
+  // state playing.
+  const { error: e2 } = await db()
+    .from("match")
+    .update({ state: "playing" })
+    .eq("id", matchId);
+  if (e2) throw e2;
+}
+
 export async function deleteMatch(matchId: string): Promise<void> {
   const { error } = await db().from("match").delete().eq("id", matchId);
   if (error) throw error;

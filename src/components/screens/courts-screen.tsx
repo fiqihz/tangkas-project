@@ -1,6 +1,6 @@
 "use client";
 
-import { useMemo, useState } from "react";
+import { useEffect, useMemo, useState } from "react";
 import { motion } from "framer-motion";
 import {
   Plus,
@@ -11,6 +11,7 @@ import {
   Search,
   Wand2,
   ListOrdered,
+  Clock,
 } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent } from "@/components/ui/card";
@@ -385,6 +386,40 @@ function TeamBlock({
   );
 }
 
+/**
+ * Timer durasi match berjalan. Menampilkan mm:ss sejak `startedAt`, tick tiap
+ * detik. Berubah warna jadi amber setelah 15 menit sebagai pengingat halus
+ * bahwa match sudah lama (host bisa pertimbangkan rotasi).
+ */
+function MatchTimer({ startedAt }: { startedAt: string }) {
+  const [now, setNow] = useState(() => Date.now());
+
+  useEffect(() => {
+    const t = setInterval(() => setNow(Date.now()), 1000);
+    return () => clearInterval(t);
+  }, []);
+
+  const started = new Date(startedAt).getTime();
+  const elapsedSec = Math.max(0, Math.floor((now - started) / 1000));
+  const mm = Math.floor(elapsedSec / 60);
+  const ss = elapsedSec % 60;
+  const longRunning = mm >= 15;
+
+  return (
+    <span
+      className={cn(
+        "flex items-center gap-1 rounded-md px-1.5 py-0.5 tabular-nums",
+        longRunning
+          ? "bg-amber-500/15 text-amber-600 dark:text-amber-400"
+          : "bg-secondary text-muted-foreground",
+      )}
+    >
+      <Clock size={11} />
+      {mm}:{ss.toString().padStart(2, "0")}
+    </span>
+  );
+}
+
 function MatchView({
   match,
   matchNumber,
@@ -418,6 +453,9 @@ function MatchView({
         >
           {isProposed ? "belum mulai" : "sedang berjalan"}
         </span>
+        {!isProposed && match.startedAt && (
+          <MatchTimer startedAt={match.startedAt} />
+        )}
       </div>
       <div className="flex items-stretch gap-2">
         <TeamBlock

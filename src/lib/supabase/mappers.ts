@@ -32,6 +32,7 @@ export function toMatch(row: DbMatch): Match {
     teamA: { playerIds: [row.team_a_p1, row.team_a_p2] },
     teamB: { playerIds: [row.team_b_p1, row.team_b_p2] },
     state: row.state,
+    startedAt: row.started_at,
     score:
       row.score_a !== null && row.score_b !== null
         ? { a: row.score_a, b: row.score_b }

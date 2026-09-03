@@ -620,7 +620,8 @@ export const useSessionStore = create<SessionState>((set, get) => ({
     if (inFlight.has(key)) return; // cegah dobel-tap
     inFlight.add(key);
     try {
-      await repo.updateMatchState(matchId, "playing");
+      // set state 'playing' + catat started_at untuk timer durasi match.
+      await repo.startMatchPlaying(matchId);
       await get().refresh();
     } catch (e) {
       set({ actionError: `Gagal memulai match: ${describe(e)}.` });

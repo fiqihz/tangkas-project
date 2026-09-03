@@ -113,6 +113,7 @@ create table if not exists match (
   score_b        int,
   winner         text check (winner in ('a','b','draw')),
   created_at     timestamptz not null default now(),
+  started_at     timestamptz,
   finished_at    timestamptz
 );
 create index if not exists idx_match_session on match(session_id);

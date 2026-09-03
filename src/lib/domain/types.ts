@@ -84,6 +84,8 @@ export interface Match {
   teamB: Team;
   /** Status match. */
   state: "proposed" | "playing" | "finished" | "unfinished";
+  /** Waktu match mulai dimainkan (ISO) — di-set saat "Mulai Main". null bila belum. */
+  startedAt?: string | null;
   /** Skor akhir (null bila belum di-Finish). */
   score: { a: number; b: number } | null;
   /** Pemenang: "a" | "b" | "draw" | null (belum selesai). */

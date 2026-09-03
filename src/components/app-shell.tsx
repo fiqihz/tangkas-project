@@ -10,7 +10,9 @@ import {
   ChevronLeft,
   History,
 } from "lucide-react";
+import { WifiOff } from "lucide-react";
 import { useSessionStore } from "@/lib/store/session-store";
+import { useOnlineStatus } from "@/lib/use-online-status";
 import { haptic } from "@/lib/haptics";
 import { cn } from "@/lib/utils";
 import { buildLeaderboard } from "@/lib/domain/leaderboard";
@@ -37,9 +39,18 @@ const TABS: { id: Tab; icon: typeof Users; label: string }[] = [
 export function AppShell() {
   const actionError = useSessionStore((s) => s.actionError);
   const clearActionError = useSessionStore((s) => s.clearActionError);
+  const online = useOnlineStatus();
 
   return (
     <>
+      {/* Banner offline global: koneksi lapangan sering putus. Beri tahu host
+          bahwa perubahan mungkin gagal tersimpan sampai koneksi kembali. */}
+      {!online && (
+        <div className="fixed inset-x-0 top-0 z-50 flex items-center justify-center gap-2 bg-destructive px-4 py-1.5 text-center text-xs font-medium text-destructive-foreground pt-[calc(env(safe-area-inset-top)+0.375rem)]">
+          <WifiOff size={13} className="shrink-0" />
+          Kamu sedang offline — perubahan mungkin gagal tersimpan.
+        </div>
+      )}
       <AppShellContent />
       {/* Toast error global: menampilkan kegagalan aksi (simpan skor, ubah
           status, hapus lapangan, dll) dari screen mana pun. */}

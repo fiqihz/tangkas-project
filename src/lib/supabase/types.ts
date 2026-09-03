@@ -77,6 +77,7 @@ export interface DbMatch {
   score_b: number | null;
   winner: "a" | "b" | "draw" | null;
   created_at: string;
+  started_at: string | null;
   finished_at: string | null;
 }
 
