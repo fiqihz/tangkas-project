@@ -285,15 +285,9 @@ export function CourtsScreen() {
             else setAutoFillMsg(null);
           }}
           onPickFirstMatch={async () => {
+            // Hanya dipanggil saat eligible (sheet menahan kasus tidak eligible
+            // & menampilkan alert inline). Tutup sheet lalu susun match pertama.
             const courtId = modeForCourt;
-            // Jika belum cukup pemain 0x, JANGAN tutup sheet — tampilkan alert
-            // agar host bisa memilih mode lain (Seimbang, Gendongan, dll).
-            if (!firstMatchEligible) {
-              setAutoFillMsg(
-                "Mode Match Pertama tidak bisa dipakai: pemain yang belum pernah main (0x) kurang dari 4. Silakan pilih mode lain di bawah.",
-              );
-              return;
-            }
             setModeForCourt(null);
             const res = await generateFirstMatch(courtId);
             if (!res.ok)
@@ -699,6 +693,11 @@ function ModePickerSheet({
   onPickFirstMatch: () => void;
   onClose: () => void;
 }) {
+  // Alert inline (di dalam sheet) saat "Match Pertama" ditekan tapi belum
+  // memenuhi syarat — agar terlihat tanpa tertutup drawer, dan host tetap
+  // bisa memilih mode lain di daftar bawahnya.
+  const [firstMatchAlert, setFirstMatchAlert] = useState(false);
+
   return (
     <Sheet open onOpenChange={(o) => !o && onClose()}>
       <SheetContent>
@@ -712,9 +711,12 @@ function ModePickerSheet({
           <button
             onClick={() => {
               haptic(12);
+              if (!firstMatchEligible) {
+                setFirstMatchAlert(true);
+                return;
+              }
               onPickFirstMatch();
             }}
-            aria-disabled={!firstMatchEligible}
             className={cn(
               "flex select-none items-start gap-3 rounded-xl border px-3.5 py-3 text-left transition-all active:scale-[0.99]",
               firstMatchEligible
@@ -734,6 +736,13 @@ function ModePickerSheet({
               </span>
             </span>
           </button>
+
+          {firstMatchAlert && !firstMatchEligible && (
+            <div className="rounded-xl border border-amber-300 bg-amber-50 px-3 py-2.5 text-sm text-amber-900 dark:border-amber-900 dark:bg-amber-950/40 dark:text-amber-100">
+              ⚠️ Mode <b>Match Pertama</b> tidak bisa dipakai: pemain yang belum
+              pernah main (0x) kurang dari 4. Pilih mode lain di bawah.
+            </div>
+          )}
 
           <div className="my-1 h-px bg-border" />
 

@@ -761,14 +761,10 @@ export const useSessionStore = create<SessionState>((set, get) => ({
     const { session, matches, players, courts } = get();
     if (!session || !courtId) return { ok: false };
 
-    // Sudah ada match aktif (proposed/playing) di lapangan ini -> jangan dobel.
-    if (
-      matches.some(
-        (m) =>
-          m.courtId === courtId &&
-          (m.state === "proposed" || m.state === "playing"),
-      )
-    ) {
+    // Sudah ada PREVIEW (proposed) di lapangan ini -> jangan buat dobel.
+    // Lapangan yang sedang 'playing' tetap boleh: preview ini jadi antrian
+    // "main berikutnya" di lapangan tsb (sama seperti mode Auto-fill lain).
+    if (matches.some((m) => m.courtId === courtId && m.state === "proposed")) {
       return { ok: false };
     }
 
