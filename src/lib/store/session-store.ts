@@ -89,6 +89,17 @@ interface SessionState {
     courtId: string | null,
     mode?: MatchMode,
   ) => Promise<{ ok: boolean; reason?: string }>;
+  /**
+   * Susun match pertama murni berdasarkan URUTAN CHECK-IN (abaikan level).
+   * Hanya untuk awal sesi: berlaku bila belum ada pemain yang main sama sekali
+   * (semua gamesPlayed === 0). Mengambil 4 pemain active non-busy paling awal
+   * check-in. Return {ok:false, reason} bila tidak memenuhi syarat.
+   */
+  generateFirstMatch: (
+    courtId: string | null,
+  ) => Promise<{ ok: boolean; reason?: string }>;
+  /** True bila fitur "Match Pertama (urut check-in)" boleh dipakai. */
+  canUseFirstMatch: () => boolean;
   setPlayerGender: (playerId: string, gender: "male" | "female") => Promise<void>;
   editProposedPlayer: (
     matchId: string,
@@ -728,6 +739,86 @@ export const useSessionStore = create<SessionState>((set, get) => ({
       set({ actionError: reason });
       return { ok: false, reason };
     }
+    } finally {
+      inFlight.delete(key);
+    }
+  },
+
+  canUseFirstMatch() {
+    const { players } = get();
+    // Belum ada satu pun match selesai (semua pemain 0x main) & minimal 4
+    // pemain active yang belum dialokasikan ke lapangan.
+    if (players.some((p) => p.gamesPlayed > 0)) return false;
+    const busy = get().busyPlayerIds();
+    const readyCount = players.filter(
+      (p) => p.status === "active" && !busy.has(p.id),
+    ).length;
+    return readyCount >= 4;
+  },
+
+  async generateFirstMatch(courtId) {
+    const { session, matches, players, courts } = get();
+    if (!session || !courtId) return { ok: false };
+
+    // Sudah ada match aktif (proposed/playing) di lapangan ini -> jangan dobel.
+    if (
+      matches.some(
+        (m) =>
+          m.courtId === courtId &&
+          (m.state === "proposed" || m.state === "playing"),
+      )
+    ) {
+      return { ok: false };
+    }
+
+    if (!get().canUseFirstMatch()) {
+      return {
+        ok: false,
+        reason:
+          "Mode Match Pertama hanya untuk awal sesi (belum ada yang main) & butuh minimal 4 pemain sudah check-in.",
+      };
+    }
+
+    const key = `firstMatch:${courtId}`;
+    if (inFlight.has(key)) return { ok: false };
+    inFlight.add(key);
+    try {
+      // Urutkan pemain active (non-busy) berdasarkan waktu check-in paling awal.
+      // Level SENGAJA diabaikan sesuai kebutuhan mode ini.
+      const busy = get().busyPlayerIds();
+      const ordered = players
+        .filter((p) => p.status === "active" && !busy.has(p.id))
+        .sort((a, b) => {
+          const at = a.checkedInAt ?? "";
+          const bt = b.checkedInAt ?? "";
+          if (at !== bt) return at.localeCompare(bt);
+          return a.name.localeCompare(b.name);
+        });
+
+      if (ordered.length < 4) {
+        return { ok: false, reason: "Pemain check-in kurang dari 4." };
+      }
+
+      const four = ordered.slice(0, 4).map((p) => p.id);
+      const teamA: [string, string] = [four[0], four[1]];
+      const teamB: [string, string] = [four[2], four[3]];
+      const courtLabel = courts.find((c) => c.id === courtId)?.label ?? null;
+
+      const created = await repo.createMatchAtomic({
+        sessionId: session.id,
+        courtId,
+        courtLabel,
+        teamA,
+        teamB,
+        state: "proposed",
+      });
+      set({ session: { ...session, current_round: created.round } });
+      await get().refresh();
+      return { ok: true };
+    } catch (e) {
+      const reason = `Gagal menyusun match pertama: ${describe(e)}.`;
+      set({ actionError: reason });
+      return { ok: false, reason };
     } finally {
       inFlight.delete(key);
     }

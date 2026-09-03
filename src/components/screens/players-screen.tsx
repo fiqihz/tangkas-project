@@ -1,7 +1,15 @@
 "use client";
 
 import { useMemo, useState } from "react";
-import { LogIn, Coffee, LogOut, Play, Plus, Search } from "lucide-react";
+import {
+  ChevronDown,
+  Coffee,
+  LogIn,
+  LogOut,
+  Play,
+  Plus,
+  Search,
+} from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent } from "@/components/ui/card";
 import { Input } from "@/components/ui/input";
@@ -28,6 +36,18 @@ export function PlayersScreen() {
   const [expanded, setExpanded] = useState<string | null>(null);
   const [adding, setAdding] = useState(false);
   const [query, setQuery] = useState("");
+  // Group status yang di-collapse (disembunyikan isinya). Default semua terbuka.
+  const [collapsed, setCollapsed] = useState<Set<PlayerStatus>>(new Set());
+
+  const toggleGroup = (status: PlayerStatus) => {
+    haptic(6);
+    setCollapsed((c) => {
+      const next = new Set(c);
+      if (next.has(status)) next.delete(status);
+      else next.add(status);
+      return next;
+    });
+  };
 
   const existingNames = useMemo(
     () => new Set(players.map((p) => p.name.toLowerCase())),
@@ -74,10 +94,16 @@ export function PlayersScreen() {
       )}
 
       {(["active", "registered", "resting", "left"] as PlayerStatus[]).map(
-        (status) =>
-          grouped[status].length > 0 && (
+        (status) => {
+          if (grouped[status].length === 0) return null;
+          const isCollapsed = collapsed.has(status);
+          return (
             <div key={status}>
-              <div className="mb-2 flex items-center gap-2 text-sm font-medium">
+              <button
+                onClick={() => toggleGroup(status)}
+                className="mb-2 flex w-full select-none items-center gap-2 text-sm font-medium active:opacity-70"
+                aria-expanded={!isCollapsed}
+              >
                 <span
                   className={cn(
                     "h-2 w-2 rounded-full",
@@ -88,22 +114,34 @@ export function PlayersScreen() {
                   )}
                 />
                 {STATUS_LABEL[status]} ({grouped[status].length})
-              </div>
-              <div className="flex flex-col gap-2">
-                {grouped[status].map((p) => (
-                  <PlayerRow
-                    key={p.id}
-                    player={p}
-                    expanded={expanded === p.id}
-                    onToggle={() => setExpanded(expanded === p.id ? null : p.id)}
-                    onSetLevel={(lv) => setPlayerLevel(p.id, lv)}
-                    onSetGender={(g) => setPlayerGender(p.id, g)}
-                    onSetStatus={(s) => setPlayerStatus(p.id, s)}
-                  />
-                ))}
-              </div>
+                <ChevronDown
+                  size={16}
+                  className={cn(
+                    "ml-auto text-muted-foreground transition-transform",
+                    isCollapsed && "-rotate-90",
+                  )}
+                />
+              </button>
+              {!isCollapsed && (
+                <div className="flex flex-col gap-2">
+                  {grouped[status].map((p) => (
+                    <PlayerRow
+                      key={p.id}
+                      player={p}
+                      expanded={expanded === p.id}
+                      onToggle={() =>
+                        setExpanded(expanded === p.id ? null : p.id)
+                      }
+                      onSetLevel={(lv) => setPlayerLevel(p.id, lv)}
+                      onSetGender={(g) => setPlayerGender(p.id, g)}
+                      onSetStatus={(s) => setPlayerStatus(p.id, s)}
+                    />
+                  ))}
+                </div>
+              )}
             </div>
-          ),
+          );
+        },
       )}
 
       <Fab

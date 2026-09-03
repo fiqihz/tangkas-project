@@ -2,7 +2,16 @@
 
 import { useMemo, useState } from "react";
 import { motion } from "framer-motion";
-import { Plus, Trash2, Pencil, Info, Play, Search, Wand2 } from "lucide-react";
+import {
+  Plus,
+  Trash2,
+  Pencil,
+  Info,
+  Play,
+  Search,
+  Wand2,
+  ListOrdered,
+} from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent } from "@/components/ui/card";
 import { Input } from "@/components/ui/input";
@@ -38,9 +47,13 @@ export function CourtsScreen() {
     courtMatchNumber,
     startMatch,
     generateLockedPreview,
+    generateFirstMatch,
+    canUseFirstMatch,
     setPlayerLevel,
     setPlayerGender,
   } = useSessionStore();
+  // Apakah mode "Match Pertama (urut check-in)" boleh dipakai saat ini.
+  const firstMatchEligible = canUseFirstMatch();
   const [autoFillMsg, setAutoFillMsg] = useState<string | null>(null);
   // Lapangan yang sedang memilih mode Auto-fill (null = sheet tertutup).
   const [modeForCourt, setModeForCourt] = useState<string | null>(null);
@@ -197,6 +210,22 @@ export function CourtsScreen() {
                     <p className="text-sm text-muted-foreground">
                       Lapangan kosong.
                     </p>
+                    {firstMatchEligible && (
+                      <Button
+                        variant="info"
+                        onClick={async () => {
+                          haptic(12);
+                          const res = await generateFirstMatch(court.id);
+                          if (!res.ok)
+                            setAutoFillMsg(
+                              res.reason ?? "Gagal menyusun match pertama.",
+                            );
+                          else setAutoFillMsg(null);
+                        }}
+                      >
+                        <ListOrdered size={16} /> Match Pertama (urut check-in)
+                      </Button>
+                    )}
                     <Button
                       variant="outline"
                       onClick={() => {

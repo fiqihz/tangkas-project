@@ -1,7 +1,7 @@
 "use client";
 
 import { useMemo, useState } from "react";
-import { Check, Search, UserPlus } from "lucide-react";
+import { Check, Search, Trash2, UserPlus } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { LevelBadge } from "@/components/ui/level-badge";
@@ -30,7 +30,8 @@ export function AddPlayerDialog({
   onClose: () => void;
 }) {
   const { addPlayer } = useSessionStore();
-  const { profiles, create: createProfile } = useProfiles();
+  const { profiles, create: createProfile, remove: removeProfile } =
+    useProfiles();
   const [tab, setTab] = useState<Tab>("roster");
 
   return (
@@ -53,6 +54,7 @@ export function AddPlayerDialog({
             profiles={profiles}
             existingNames={existingNames}
             onAdd={addPlayer}
+            onDeleteProfile={removeProfile}
             onClose={onClose}
           />
         ) : (
@@ -113,6 +115,7 @@ function RosterTab({
   profiles,
   existingNames,
   onAdd,
+  onDeleteProfile,
   onClose,
 }: {
   profiles: DbPlayerProfile[];
@@ -123,11 +126,17 @@ function RosterTab({
     profileId?: string | null;
     status?: "registered";
   }) => Promise<void>;
+  onDeleteProfile: (id: string) => Promise<void>;
   onClose: () => void;
 }) {
   const [query, setQuery] = useState("");
   const [selected, setSelected] = useState<Set<string>>(new Set());
   const [saving, setSaving] = useState(false);
+  // Profil roster yang menunggu konfirmasi hapus (null = tak ada).
+  const [confirmDelete, setConfirmDelete] = useState<DbPlayerProfile | null>(
+    null,
+  );
+  const [deleting, setDeleting] = useState(false);
 
   const available = useMemo(
     () => profiles.filter((p) => !existingNames.has(p.name.toLowerCase())),
@@ -195,38 +204,52 @@ function RosterTab({
         {filtered.map((p) => {
           const picked = selected.has(p.id);
           return (
-            <button
+            <div
               key={p.id}
-              onClick={() => toggle(p.id)}
               className={cn(
-                "flex min-h-[52px] select-none items-center justify-between gap-2 rounded-xl border px-3 py-2 text-left transition-all active:scale-[0.98]",
+                "flex min-h-[52px] items-center gap-1 rounded-xl border pr-1 transition-all",
                 picked
                   ? "border-primary bg-primary/10"
-                  : "border-border bg-card active:bg-secondary",
+                  : "border-border bg-card",
               )}
             >
-              <div className="flex min-w-0 items-center gap-2.5">
-                <span
-                  className={cn(
-                    "flex h-6 w-6 shrink-0 items-center justify-center rounded-full border",
-                    picked
-                      ? "border-primary bg-primary text-primary-foreground"
-                      : "border-border",
-                  )}
-                >
-                  {picked && <Check size={14} />}
-                </span>
-                <div className="min-w-0">
-                  <div className="flex items-center gap-1.5 truncate font-medium">
-                    {p.name} <GenderBadge gender={p.gender} />
-                  </div>
-                  <div className="text-xs text-muted-foreground">
-                    🏸 {p.sessions_played}x mabar
+              <button
+                onClick={() => toggle(p.id)}
+                className="flex min-w-0 flex-1 select-none items-center justify-between gap-2 px-3 py-2 text-left transition-all active:scale-[0.98]"
+              >
+                <div className="flex min-w-0 items-center gap-2.5">
+                  <span
+                    className={cn(
+                      "flex h-6 w-6 shrink-0 items-center justify-center rounded-full border",
+                      picked
+                        ? "border-primary bg-primary text-primary-foreground"
+                        : "border-border",
+                    )}
+                  >
+                    {picked && <Check size={14} />}
+                  </span>
+                  <div className="min-w-0">
+                    <div className="flex items-center gap-1.5 truncate font-medium">
+                      {p.name} <GenderBadge gender={p.gender} />
+                    </div>
+                    <div className="text-xs text-muted-foreground">
+                      🏸 {p.sessions_played}x mabar
+                    </div>
                   </div>
                 </div>
-              </div>
-              <LevelBadge level={p.level} className="shrink-0" />
-            </button>
+                <LevelBadge level={p.level} className="shrink-0" />
+              </button>
+              <button
+                onClick={() => {
+                  haptic(10);
+                  setConfirmDelete(p);
+                }}
+                className="flex h-9 w-9 shrink-0 items-center justify-center rounded-lg text-muted-foreground active:scale-90 active:bg-destructive/10 active:text-destructive"
+                aria-label={`Hapus ${p.name} dari roster`}
+              >
+                <Trash2 size={16} />
+              </button>
+            </div>
           );
         })}
       </div>
@@ -242,6 +265,58 @@ function RosterTab({
             ? `Tambah ${selected.size} pemain`
             : "Pilih pemain dulu"}
       </Button>
+
+      {confirmDelete && (
+        <Sheet
+          open
+          onOpenChange={(o) => !o && !deleting && setConfirmDelete(null)}
+        >
+          <SheetContent>
+            <SheetTitle className="text-lg font-bold">
+              Hapus {confirmDelete.name} dari roster?
+            </SheetTitle>
+            <p className="mt-2 text-sm text-muted-foreground">
+              Pemain ini akan dihapus permanen dari roster (daftar pemain
+              tersimpan). Riwayat mabar yang sudah lewat tetap aman. Tindakan ini
+              tidak bisa dibatalkan.
+            </p>
+            <div className="mt-4 flex gap-2">
+              <Button
+                variant="outline"
+                className="flex-1"
+                onClick={() => setConfirmDelete(null)}
+                disabled={deleting}
+              >
+                Batal
+              </Button>
+              <Button
+                variant="destructive"
+                className="flex-1"
+                disabled={deleting}
+                onClick={async () => {
+                  if (deleting) return;
+                  haptic(15);
+                  setDeleting(true);
+                  try {
+                    await onDeleteProfile(confirmDelete.id);
+                    // buang dari pilihan bila sempat terpilih
+                    setSelected((s) => {
+                      const next = new Set(s);
+                      next.delete(confirmDelete.id);
+                      return next;
+                    });
+                    setConfirmDelete(null);
+                  } finally {
+                    setDeleting(false);
+                  }
+                }}
+              >
+                {deleting ? "Menghapus…" : "Hapus"}
+              </Button>
+            </div>
+          </SheetContent>
+        </Sheet>
+      )}
     </div>
   );
 }
