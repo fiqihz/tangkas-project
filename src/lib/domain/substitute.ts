@@ -37,12 +37,17 @@ export function findSubstitute(params: {
   const all = [...match.teamA, ...match.teamB];
   const leavingTeam = match.teamA.includes(leavingId) ? match.teamA : match.teamB;
   const otherTeam = match.teamA.includes(leavingId) ? match.teamB : match.teamA;
-  const partnerId = leavingTeam.find((id) => id !== leavingId)!;
+  const partnerId = leavingTeam.find((id) => id !== leavingId);
   const remaining = all.filter((id) => id !== leavingId);
 
-  const partner = byId.get(partnerId)!;
-  const opp1 = byId.get(otherTeam[0])!;
-  const opp2 = byId.get(otherTeam[1])!;
+  // Pengaman: bila ada pemain di match yang tidak ada di roster (mis. sudah
+  // dihapus, atau data players basi relatif terhadap matches), jangan crash —
+  // anggap tidak ada pengganti valid. Sebelumnya ini pakai non-null assertion
+  // (`byId.get(...)!`) yang bisa melempar TypeError saat diakses .level/.id.
+  const partner = partnerId ? byId.get(partnerId) : undefined;
+  const opp1 = byId.get(otherTeam[0]);
+  const opp2 = byId.get(otherTeam[1]);
+  if (!partner || !opp1 || !opp2) return null;
 
   const ranked = sortByQueuePriority(pool);
 

@@ -15,6 +15,7 @@ import { haptic } from "@/lib/haptics";
 import { cn } from "@/lib/utils";
 import { buildLeaderboard } from "@/lib/domain/leaderboard";
 import { ScreenTransition } from "@/components/ui/motion";
+import { Toast } from "@/components/ui/toast";
 import { SessionsListScreen } from "@/components/screens/sessions-list-screen";
 import { PlayersScreen } from "@/components/screens/players-screen";
 import { CourtsScreen } from "@/components/screens/courts-screen";
@@ -34,6 +35,24 @@ const TABS: { id: Tab; icon: typeof Users; label: string }[] = [
 ];
 
 export function AppShell() {
+  const actionError = useSessionStore((s) => s.actionError);
+  const clearActionError = useSessionStore((s) => s.clearActionError);
+
+  return (
+    <>
+      <AppShellContent />
+      {/* Toast error global: menampilkan kegagalan aksi (simpan skor, ubah
+          status, hapus lapangan, dll) dari screen mana pun. */}
+      <Toast
+        message={actionError}
+        variant="error"
+        onClose={clearActionError}
+      />
+    </>
+  );
+}
+
+function AppShellContent() {
   const { session, loadSessions, backToList, finishedResult } =
     useSessionStore();
   const [tab, setTab] = useState<Tab>("courts");

@@ -26,6 +26,12 @@ interface SessionState {
   players: SessionPlayer[];
   matches: Match[];
   error: string | null;
+  /**
+   * Pesan error dari aksi (mutation) yang gagal — ditampilkan sebagai Toast
+   * global di AppShell. Terpisah dari `error` (dipakai form create-session).
+   */
+  actionError: string | null;
+  clearActionError: () => void;
   /** Peta id session_player -> profile_id (untuk sinkron level ke roster). */
   profileIdOf: Record<string, string | null>;
 
@@ -132,6 +138,13 @@ function byIdMap(players: SessionPlayer[]) {
   return new Map(players.map((p) => [p.id, p]));
 }
 
+/**
+ * Guard anti dobel-eksekusi (mis. dobel-tap di HP laggy). Menyimpan "kunci"
+ * aksi yang sedang berjalan. Karena ini murni proteksi eksekusi (bukan yang
+ * perlu memicu render), disimpan di level modul, bukan di state React.
+ */
+const inFlight = new Set<string>();
+
 export const useSessionStore = create<SessionState>((set, get) => ({
   loading: true,
   sessions: [],
@@ -140,8 +153,13 @@ export const useSessionStore = create<SessionState>((set, get) => ({
   players: [],
   matches: [],
   error: null,
+  actionError: null,
   profileIdOf: {},
   finishedResult: null,
+
+  clearActionError() {
+    set({ actionError: null });
+  },
 
   async loadSessions() {
     set({ loading: true, error: null });
@@ -242,8 +260,12 @@ export const useSessionStore = create<SessionState>((set, get) => ({
       });
       return;
     }
-    await repo.updateSession(sessionId, { status: "ongoing" });
-    await get().openSession(sessionId);
+    try {
+      await repo.updateSession(sessionId, { status: "ongoing" });
+      await get().openSession(sessionId);
+    } catch (e) {
+      set({ actionError: `Gagal memulai mabar: ${describe(e)}.` });
+    }
   },
 
   async reactivateSession(sessionId) {
@@ -268,16 +290,27 @@ export const useSessionStore = create<SessionState>((set, get) => ({
   },
 
   async deleteSession(sessionId) {
-    await repo.deleteSession(sessionId);
-    await get().loadSessions();
+    try {
+      await repo.deleteSession(sessionId);
+      await get().loadSessions();
+    } catch (e) {
+      set({ actionError: `Gagal menghapus mabar: ${describe(e)}.` });
+    }
   },
 
   async finishSession() {
     const { session, players } = get();
     if (!session) return;
-    // counter "ikut mabar" +1 untuk pemain yang benar-benar main (task #4)
-    await get().incrementSessionsForPlayed();
-    await repo.finishSession(session.id);
+    try {
+      // counter "ikut mabar" +1 untuk pemain yang benar-benar main (task #4)
+      await get().incrementSessionsForPlayed();
+      await repo.finishSession(session.id);
+    } catch (e) {
+      // Jangan clear board / tampilkan hasil akhir kalau gagal menyelesaikan —
+      // biar host bisa coba lagi tanpa kehilangan konteks sesi.
+      set({ actionError: `Gagal menyelesaikan mabar: ${describe(e)}. Coba lagi.` });
+      return;
+    }
     // simpan snapshot hasil akhir untuk halaman Final Result
     set({
       finishedResult: {
@@ -301,50 +334,62 @@ export const useSessionStore = create<SessionState>((set, get) => ({
   async addPlayer(p) {
     const { session } = get();
     if (!session) return;
-    await repo.addSessionPlayer(session.id, p);
-    await get().refresh();
+    try {
+      await repo.addSessionPlayer(session.id, p);
+      await get().refresh();
+    } catch (e) {
+      set({ actionError: `Gagal menambah pemain: ${describe(e)}.` });
+    }
   },
 
   async setPlayerLevel(playerId, level) {
     const { players, profileIdOf } = get();
     const player = players.find((p) => p.id === playerId);
-    await repo.updateSessionPlayer(playerId, { level });
+    try {
+      await repo.updateSessionPlayer(playerId, { level });
 
-    // Sinkron level ke roster (player_profile) agar persisten lintas mabar.
-    const profileId = profileIdOf[playerId] ?? null;
-    if (profileId) {
-      // sudah terhubung ke profil -> update level-nya
-      await repo.updateProfile(profileId, { level });
-    } else if (player) {
-      // belum punya profil (pemain baru diinput manual) -> buat & tautkan
-      try {
-        const created = await repo.createProfile(player.name, level);
-        await repo.linkSessionPlayerProfile(playerId, created.id);
-      } catch {
-        // kalau nama sudah ada di roster, cukup abaikan pembuatan duplikat
+      // Sinkron level ke roster (player_profile) agar persisten lintas mabar.
+      const profileId = profileIdOf[playerId] ?? null;
+      if (profileId) {
+        // sudah terhubung ke profil -> update level-nya
+        await repo.updateProfile(profileId, { level });
+      } else if (player) {
+        // belum punya profil (pemain baru diinput manual) -> buat & tautkan
+        try {
+          const created = await repo.createProfile(player.name, level);
+          await repo.linkSessionPlayerProfile(playerId, created.id);
+        } catch {
+          // kalau nama sudah ada di roster, cukup abaikan pembuatan duplikat
+        }
       }
-    }
 
-    await get().refresh();
+      await get().refresh();
+    } catch (e) {
+      set({ actionError: `Gagal menyimpan level pemain: ${describe(e)}.` });
+    }
   },
 
   async setPlayerGender(playerId, gender) {
     const { players, profileIdOf } = get();
     const player = players.find((p) => p.id === playerId);
-    await repo.updateSessionPlayer(playerId, { gender });
-    // Sinkron ke roster agar persisten lintas mabar.
-    const profileId = profileIdOf[playerId] ?? null;
-    if (profileId) {
-      await repo.updateProfile(profileId, { gender });
-    } else if (player) {
-      try {
-        const created = await repo.createProfile(player.name, player.level, gender);
-        await repo.linkSessionPlayerProfile(playerId, created.id);
-      } catch {
-        // abaikan bila nama sudah ada di roster
+    try {
+      await repo.updateSessionPlayer(playerId, { gender });
+      // Sinkron ke roster agar persisten lintas mabar.
+      const profileId = profileIdOf[playerId] ?? null;
+      if (profileId) {
+        await repo.updateProfile(profileId, { gender });
+      } else if (player) {
+        try {
+          const created = await repo.createProfile(player.name, player.level, gender);
+          await repo.linkSessionPlayerProfile(playerId, created.id);
+        } catch {
+          // abaikan bila nama sudah ada di roster
+        }
       }
+      await get().refresh();
+    } catch (e) {
+      set({ actionError: `Gagal menyimpan gender pemain: ${describe(e)}.` });
     }
-    await get().refresh();
   },
 
   async setPlayerStatus(playerId, status) {
@@ -360,59 +405,90 @@ export const useSessionStore = create<SessionState>((set, get) => ({
         patch.checked_in_at = new Date().toISOString();
       }
     }
-    await repo.updateSessionPlayer(playerId, patch);
-    await get().refresh();
+    try {
+      await repo.updateSessionPlayer(playerId, patch);
+      await get().refresh();
+    } catch (e) {
+      set({ actionError: `Gagal mengubah status pemain: ${describe(e)}.` });
+    }
   },
 
   async addCourt() {
     const { session, courts } = get();
     if (!session) return;
-    await repo.addCourt(session.id, courts.length);
-    await repo.updateSession(session.id, { courts: courts.length + 1 });
-    await get().refresh();
-    set({ session: { ...session, courts: courts.length + 1 } });
+    if (inFlight.has("addCourt")) return; // cegah dobel-tap -> lapangan dobel
+    inFlight.add("addCourt");
+    try {
+      await repo.addCourt(session.id, courts.length);
+      await repo.updateSession(session.id, { courts: courts.length + 1 });
+      await get().refresh();
+      set({ session: { ...session, courts: courts.length + 1 } });
+    } catch (e) {
+      set({ actionError: `Gagal menambah lapangan: ${describe(e)}.` });
+    } finally {
+      inFlight.delete("addCourt");
+    }
   },
 
   async renameCourt(courtId, label) {
-    await repo.updateCourtLabel(courtId, label.trim() || "Lapangan");
-    await get().refresh();
+    try {
+      await repo.updateCourtLabel(courtId, label.trim() || "Lapangan");
+      await get().refresh();
+    } catch (e) {
+      set({ actionError: `Gagal mengubah nama lapangan: ${describe(e)}.` });
+    }
   },
 
   async removeCourt(courtId) {
     const { session, courts, matches } = get();
     if (!session) return;
 
-    // Tangani match aktif di lapangan ini sebelum court dihapus:
-    //  - proposed (belum mulai) -> batalkan (hapus match), pemain balik active
-    //  - playing (berjalan)     -> tandai 'unfinished' (masuk history), pemain balik active
-    const activeMatch = matches.find(
-      (m) =>
-        m.courtId === courtId &&
-        (m.state === "proposed" || m.state === "playing"),
-    );
-    if (activeMatch) {
-      const playerIds = [
-        ...activeMatch.teamA.playerIds,
-        ...activeMatch.teamB.playerIds,
-      ];
-      // kembalikan pemain ke antrian (active) agar bisa di-generate lagi
-      await Promise.all(
-        playerIds.map((id) =>
-          repo.updateSessionPlayer(id, { status: "active" }),
-        ),
+    const key = `removeCourt:${courtId}`;
+    if (inFlight.has(key)) return; // cegah dobel-eksekusi hapus lapangan sama
+    inFlight.add(key);
+    try {
+      // Tangani match aktif di lapangan ini sebelum court dihapus:
+      //  - proposed (belum mulai) -> batalkan (hapus match), pemain balik active
+      //  - playing (berjalan)     -> tandai 'unfinished' (masuk history), pemain balik active
+      const activeMatch = matches.find(
+        (m) =>
+          m.courtId === courtId &&
+          (m.state === "proposed" || m.state === "playing"),
       );
-      if (activeMatch.state === "proposed") {
-        await repo.deleteMatch(activeMatch.id);
-      } else {
-        await repo.updateMatchState(activeMatch.id, "unfinished");
+      if (activeMatch) {
+        const playerIds = [
+          ...activeMatch.teamA.playerIds,
+          ...activeMatch.teamB.playerIds,
+        ];
+        // kembalikan pemain ke antrian (active) agar bisa di-generate lagi
+        await Promise.all(
+          playerIds.map((id) =>
+            repo.updateSessionPlayer(id, { status: "active" }),
+          ),
+        );
+        if (activeMatch.state === "proposed") {
+          await repo.deleteMatch(activeMatch.id);
+        } else {
+          await repo.updateMatchState(activeMatch.id, "unfinished");
+        }
       }
-    }
 
-    await repo.removeCourt(courtId);
-    const newCount = Math.max(0, courts.length - 1);
-    await repo.updateSession(session.id, { courts: newCount });
-    await get().refresh();
-    set({ session: { ...session, courts: newCount } });
+      await repo.removeCourt(courtId);
+      const newCount = Math.max(0, courts.length - 1);
+      await repo.updateSession(session.id, { courts: newCount });
+      await get().refresh();
+      set({ session: { ...session, courts: newCount } });
+    } catch (e) {
+      set({ actionError: `Gagal menghapus lapangan: ${describe(e)}.` });
+      // sinkronkan UI dengan kondisi DB terkini agar tidak tampil stale
+      try {
+        await get().refresh();
+      } catch {
+        // biarkan; error utama sudah dilaporkan
+      }
+    } finally {
+      inFlight.delete(key);
+    }
   },
 
   currentMatchByCourt(courtId) {
@@ -456,27 +532,40 @@ export const useSessionStore = create<SessionState>((set, get) => ({
     if (!session) return;
     const round = session.current_round + 1;
     const courtLabel = courts.find((c) => c.id === courtId)?.label ?? null;
-    // match dibuat sebagai 'proposed' (belum mulai) — host tap "Mulai Main"
-    await repo.createMatch({
-      sessionId: session.id,
-      courtId,
-      courtLabel,
-      round,
-      teamA,
-      teamB,
-      state: "proposed",
-    });
-    await repo.updateSession(session.id, { current_round: round });
-    set({ session: { ...session, current_round: round } });
-    await get().refresh();
+    try {
+      // match dibuat sebagai 'proposed' (belum mulai) — host tap "Mulai Main"
+      await repo.createMatch({
+        sessionId: session.id,
+        courtId,
+        courtLabel,
+        round,
+        teamA,
+        teamB,
+        state: "proposed",
+      });
+      await repo.updateSession(session.id, { current_round: round });
+      set({ session: { ...session, current_round: round } });
+      await get().refresh();
+    } catch (e) {
+      set({ actionError: `Gagal menyusun match: ${describe(e)}.` });
+    }
   },
 
   async startMatch(matchId) {
     // Preview TIDAK di-generate otomatis di sini. Host menekan tombol
     // "Auto-fill" per lapangan untuk menyusun preview — supaya rotasi bisa
     // mencampur pemain lintas lapangan (pool menunggu lebih penuh).
-    await repo.updateMatchState(matchId, "playing");
-    await get().refresh();
+    const key = `startMatch:${matchId}`;
+    if (inFlight.has(key)) return; // cegah dobel-tap
+    inFlight.add(key);
+    try {
+      await repo.updateMatchState(matchId, "playing");
+      await get().refresh();
+    } catch (e) {
+      set({ actionError: `Gagal memulai match: ${describe(e)}.` });
+    } finally {
+      inFlight.delete(key);
+    }
   },
 
   playingMatchByCourt(courtId) {
@@ -505,6 +594,13 @@ export const useSessionStore = create<SessionState>((set, get) => ({
       return { ok: false };
     }
 
+    // Guard dobel-tap: dua tap simultan bisa lolos cek "sudah ada proposed"
+    // di atas (keduanya baca state lama) -> tanpa guard bisa buat 2 preview.
+    // finally memastikan key selalu dibersihkan walau ada banyak return di tengah.
+    const key = `genPreview:${courtId}`;
+    if (inFlight.has(key)) return { ok: false };
+    inFlight.add(key);
+    try {
     const history = MatchHistory.fromMatches(matches);
     // Eksklusif: kecualikan semua pemain yang sudah di proposed/playing mana pun.
     const busy = get().busyPlayerIds();
@@ -563,19 +659,28 @@ export const useSessionStore = create<SessionState>((set, get) => ({
     }
 
     const courtLabel = courts.find((c) => c.id === courtId)?.label ?? null;
-    await repo.createMatch({
-      sessionId: session.id,
-      courtId,
-      courtLabel,
-      round,
-      teamA: prop.teamA,
-      teamB: prop.teamB,
-      state: "proposed",
-    });
-    await repo.updateSession(session.id, { current_round: round });
-    set({ session: { ...session, current_round: round } });
-    await get().refresh();
-    return { ok: true };
+    try {
+      await repo.createMatch({
+        sessionId: session.id,
+        courtId,
+        courtLabel,
+        round,
+        teamA: prop.teamA,
+        teamB: prop.teamB,
+        state: "proposed",
+      });
+      await repo.updateSession(session.id, { current_round: round });
+      set({ session: { ...session, current_round: round } });
+      await get().refresh();
+      return { ok: true };
+    } catch (e) {
+      const reason = `Gagal menyusun preview: ${describe(e)}.`;
+      set({ actionError: reason });
+      return { ok: false, reason };
+    }
+    } finally {
+      inFlight.delete(key);
+    }
   },
 
   async finishMatch(matchId, scoreA, scoreB, winner) {
@@ -584,40 +689,50 @@ export const useSessionStore = create<SessionState>((set, get) => ({
     const match = matches.find((m) => m.id === matchId);
     if (!match) return;
 
-    await repo.finishMatch(matchId, scoreA, scoreB, winner);
+    try {
+      await repo.finishMatch(matchId, scoreA, scoreB, winner);
 
-    // update statistik + jatah main pemain
-    const teamA = new Set(match.teamA.playerIds);
-    const teamB = new Set(match.teamB.playerIds);
-    const involved = [...match.teamA.playerIds, ...match.teamB.playerIds];
-    const map = byIdMap(players);
+      // update statistik + jatah main pemain
+      const teamA = new Set(match.teamA.playerIds);
+      const teamB = new Set(match.teamB.playerIds);
+      const involved = [...match.teamA.playerIds, ...match.teamB.playerIds];
+      const map = byIdMap(players);
 
-    await Promise.all(
-      involved.map((id) => {
-        const p = map.get(id);
-        if (!p) return Promise.resolve();
-        const inA = teamA.has(id);
-        const scored = inA ? scoreA : scoreB;
-        const conceded = inA ? scoreB : scoreA;
-        const won = (inA && winner === "a") || (teamB.has(id) && winner === "b");
-        const lost = (inA && winner === "b") || (teamB.has(id) && winner === "a");
-        const drew = winner === "draw";
-        return repo.updateSessionPlayer(id, {
-          games_played: p.gamesPlayed + 1,
-          last_played_round: match.round,
-          wins: p.wins + (won ? 1 : 0),
-          losses: p.losses + (lost ? 1 : 0),
-          draws: p.draws + (drew ? 1 : 0),
-          points_scored: p.pointsScored + scored,
-          points_conceded: p.pointsConceded + conceded,
-        });
-      }),
-    );
+      await Promise.all(
+        involved.map((id) => {
+          const p = map.get(id);
+          if (!p) return Promise.resolve();
+          const inA = teamA.has(id);
+          const scored = inA ? scoreA : scoreB;
+          const conceded = inA ? scoreB : scoreA;
+          const won = (inA && winner === "a") || (teamB.has(id) && winner === "b");
+          const lost = (inA && winner === "b") || (teamB.has(id) && winner === "a");
+          const drew = winner === "draw";
+          return repo.updateSessionPlayer(id, {
+            games_played: p.gamesPlayed + 1,
+            last_played_round: match.round,
+            wins: p.wins + (won ? 1 : 0),
+            losses: p.losses + (lost ? 1 : 0),
+            draws: p.draws + (drew ? 1 : 0),
+            points_scored: p.pointsScored + scored,
+            points_conceded: p.pointsConceded + conceded,
+          });
+        }),
+      );
+    } catch (e) {
+      set({ actionError: `Gagal menyimpan skor: ${describe(e)}. Coba lagi.` });
+    }
 
     // Preview yang sudah di-lock (proposed) di lapangan ini otomatis "naik"
     // jadi match berikutnya. Preview baru TIDAK di-generate otomatis — host
     // menekan tombol "Auto-fill" per lapangan untuk menyusunnya.
-    await get().refresh();
+    // refresh() tetap dijalankan agar UI sinkron dengan kondisi DB terkini,
+    // baik saat sukses maupun setelah gagal sebagian.
+    try {
+      await get().refresh();
+    } catch (e) {
+      set({ actionError: `Gagal memuat data terbaru: ${describe(e)}.` });
+    }
   },
 
   async restProposedPlayer(matchId, playerId) {

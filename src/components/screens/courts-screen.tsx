@@ -53,6 +53,11 @@ export function CourtsScreen() {
     id: string;
     label: string;
   } | null>(null);
+  // Lapangan yang menunggu konfirmasi hapus (null = tak ada).
+  const [deleteFor, setDeleteFor] = useState<{
+    id: string;
+    label: string;
+  } | null>(null);
   const [playerAction, setPlayerAction] = useState<{
     match: Match;
     playerId: string;
@@ -148,7 +153,7 @@ export function CourtsScreen() {
                   <button
                     onClick={() => {
                       haptic(10);
-                      removeCourt(court.id);
+                      setDeleteFor({ id: court.id, label: court.label });
                     }}
                     className="flex h-9 w-9 items-center justify-center rounded-lg text-muted-foreground active:scale-90 active:bg-secondary"
                     aria-label="Hapus lapangan"
@@ -263,6 +268,20 @@ export function CourtsScreen() {
             setCompleteInfoFor(null);
             setFinishFor(m);
           }}
+        />
+      )}
+
+      {deleteFor && (
+        <DeleteCourtDialog
+          label={deleteFor.label}
+          hasPlaying={!!playingMatchByCourt(deleteFor.id)}
+          hasProposed={!!proposedMatchByCourt(deleteFor.id)}
+          onConfirm={async () => {
+            const id = deleteFor.id;
+            setDeleteFor(null);
+            await removeCourt(id);
+          }}
+          onClose={() => setDeleteFor(null)}
         />
       )}
 
@@ -656,6 +675,77 @@ function ModePickerSheet({
           ))}
           <Button variant="outline" className="mt-1" onClick={onClose}>
             Batal
+          </Button>
+        </div>
+      </SheetContent>
+    </Sheet>
+  );
+}
+
+function DeleteCourtDialog({
+  label,
+  hasPlaying,
+  hasProposed,
+  onConfirm,
+  onClose,
+}: {
+  label: string;
+  hasPlaying: boolean;
+  hasProposed: boolean;
+  onConfirm: () => Promise<void>;
+  onClose: () => void;
+}) {
+  const [deleting, setDeleting] = useState(false);
+
+  const confirm = async () => {
+    if (deleting) return;
+    haptic(15);
+    setDeleting(true);
+    try {
+      await onConfirm();
+    } finally {
+      setDeleting(false);
+    }
+  };
+
+  return (
+    <Sheet open onOpenChange={(o) => !o && !deleting && onClose()}>
+      <SheetContent>
+        <SheetTitle className="text-lg font-bold">Hapus {label}?</SheetTitle>
+        {hasPlaying ? (
+          <div className="mt-2 rounded-xl border border-destructive/50 bg-destructive/10 px-3 py-2.5 text-sm text-destructive">
+            ⚠️ Ada match yang <b>sedang berjalan</b> di lapangan ini. Menghapus
+            lapangan akan <b>membatalkan match tersebut</b> — skor yang belum
+            di-input hilang dan pemainnya dikembalikan ke status aktif. Tindakan
+            ini tidak bisa dibatalkan.
+          </div>
+        ) : hasProposed ? (
+          <p className="mt-2 text-sm text-muted-foreground">
+            Ada preview match berikutnya di lapangan ini. Menghapus lapangan akan
+            membatalkan preview tersebut. Tindakan ini tidak bisa dibatalkan.
+          </p>
+        ) : (
+          <p className="mt-2 text-sm text-muted-foreground">
+            Lapangan ini akan dihapus dari sesi. Tindakan ini tidak bisa
+            dibatalkan.
+          </p>
+        )}
+        <div className="mt-4 flex gap-2">
+          <Button
+            variant="outline"
+            className="flex-1"
+            onClick={onClose}
+            disabled={deleting}
+          >
+            Batal
+          </Button>
+          <Button
+            variant="destructive"
+            className="flex-1"
+            onClick={confirm}
+            disabled={deleting}
+          >
+            {deleting ? "Menghapus…" : "Hapus lapangan"}
           </Button>
         </div>
       </SheetContent>
