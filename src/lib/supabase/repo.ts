@@ -4,6 +4,7 @@
 // Dirancang agar mudah di-upgrade ke Opsi C (tinggal ganti filter community).
 // ============================================================================
 import type { Level, PlayerStatus } from "@/lib/domain/types";
+import type { ResolvedMatch } from "@/lib/domain/roster-stats";
 import { getSupabase } from "./client";
 import { toMatch, toSessionPlayer } from "./mappers";
 import {
@@ -561,6 +562,66 @@ export function subscribeToSession(
     // removeChannel juga meng-unsubscribe channel-nya.
     void supabase.removeChannel(channel);
   };
+}
+
+// ---------------------------------------------------------------------------
+// STATISTIK LINTAS-MABAR (roster) — agregasi semua mabar di community
+// ---------------------------------------------------------------------------
+/**
+ * Ambil semua match yang sudah selesai di seluruh mabar community, lalu
+ * resolve tiap slot pemain (session_player.id) menjadi profile_id agar bisa
+ * diagregasi lintas-mabar (identitas roster persisten).
+ *
+ * Slot yang session_player-nya tidak tertaut ke roster (profile_id null) atau
+ * sudah terhapus akan bernilai null pada ResolvedMatch dan diabaikan saat
+ * dihitung oleh domain/roster-stats.
+ */
+export async function listResolvedMatches(
+  communityId = DEFAULT_COMMUNITY_ID,
+): Promise<ResolvedMatch[]> {
+  // 1. Semua sesi milik community.
+  const sessions = await listSessions(communityId);
+  const sessionIds = sessions.map((s) => s.id);
+  if (sessionIds.length === 0) return [];
+
+  // 2. session_player -> profile_id (untuk semua sesi community).
+  const { data: spRows, error: spErr } = await db()
+    .from("session_player")
+    .select("id, profile_id")
+    .in("session_id", sessionIds);
+  if (spErr) throw spErr;
+  const profileOf = new Map<string, string | null>();
+  for (const r of spRows ?? []) profileOf.set(r.id, r.profile_id);
+
+  // 3. Semua match 'finished' (punya winner) di sesi-sesi tersebut.
+  const { data: mRows, error: mErr } = await db()
+    .from("match")
+    .select(
+      "session_id, team_a_p1, team_a_p2, team_b_p1, team_b_p2, score_a, score_b, winner, state",
+    )
+    .in("session_id", sessionIds)
+    .eq("state", "finished");
+  if (mErr) throw mErr;
+
+  const resolved: ResolvedMatch[] = [];
+  for (const m of mRows ?? []) {
+    if (m.winner === null || m.score_a === null || m.score_b === null) continue;
+    resolved.push({
+      sessionId: m.session_id,
+      teamA: [
+        profileOf.get(m.team_a_p1) ?? null,
+        profileOf.get(m.team_a_p2) ?? null,
+      ],
+      teamB: [
+        profileOf.get(m.team_b_p1) ?? null,
+        profileOf.get(m.team_b_p2) ?? null,
+      ],
+      scoreA: m.score_a,
+      scoreB: m.score_b,
+      winner: m.winner as "a" | "b" | "draw",
+    });
+  }
+  return resolved;
 }
 
 // ---------------------------------------------------------------------------

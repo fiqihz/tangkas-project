@@ -10,9 +10,10 @@ import {
   ChevronLeft,
   History,
 } from "lucide-react";
-import { WifiOff } from "lucide-react";
+import { WifiOff, Share2 } from "lucide-react";
 import { useSessionStore } from "@/lib/store/session-store";
 import { useOnlineStatus } from "@/lib/use-online-status";
+import { buildResultText, shareResultText } from "@/lib/share-result";
 import { haptic } from "@/lib/haptics";
 import { cn } from "@/lib/utils";
 import { buildLeaderboard } from "@/lib/domain/leaderboard";
@@ -178,6 +179,18 @@ function AppShellContent() {
 function ReadOnlyResult() {
   const { session, players, backToList } = useSessionStore();
   const rows = buildLeaderboard(players.filter((p) => p.gamesPlayed > 0));
+  const [toast, setToast] = useState<string | null>(null);
+
+  const share = async () => {
+    if (!session) return;
+    haptic(12);
+    const outcome = await shareResultText(
+      buildResultText(session.name, players.filter((p) => p.gamesPlayed > 0)),
+    );
+    if (outcome === "copied") setToast("Hasil disalin ke clipboard.");
+    else if (outcome === "failed")
+      setToast("Gagal membagikan hasil. Coba lagi.");
+  };
 
   return (
     <div className="mx-auto flex h-dvh max-w-md flex-col overflow-hidden">
@@ -194,7 +207,7 @@ function ReadOnlyResult() {
             <ChevronLeft size={22} />
           </button>
           <span className="text-xl">🏁</span>
-          <div className="min-w-0">
+          <div className="min-w-0 flex-1">
             <div className="truncate font-bold leading-tight">
               {session?.name}
             </div>
@@ -202,6 +215,15 @@ function ReadOnlyResult() {
               Hasil akhir (read-only) · aktifkan lagi untuk edit
             </div>
           </div>
+          {rows.length > 0 && (
+            <button
+              onClick={share}
+              className="flex h-9 w-9 shrink-0 items-center justify-center rounded-lg text-muted-foreground active:scale-90 active:bg-secondary"
+              aria-label="Bagikan hasil"
+            >
+              <Share2 size={18} />
+            </button>
+          )}
         </div>
       </header>
 
@@ -256,6 +278,8 @@ function ReadOnlyResult() {
           </div>
         )}
       </main>
+
+      <Toast message={toast} onClose={() => setToast(null)} />
     </div>
   );
 }

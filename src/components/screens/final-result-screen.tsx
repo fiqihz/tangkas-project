@@ -1,12 +1,14 @@
 "use client";
 
-import { useMemo } from "react";
+import { useMemo, useState } from "react";
 import { motion } from "framer-motion";
-import { RotateCcw } from "lucide-react";
+import { RotateCcw, Share2 } from "lucide-react";
 import { Button } from "@/components/ui/button";
+import { Toast } from "@/components/ui/toast";
 import { buildLeaderboard } from "@/lib/domain/leaderboard";
 import type { SessionPlayer } from "@/lib/domain/types";
 import { useSessionStore } from "@/lib/store/session-store";
+import { buildResultText, shareResultText } from "@/lib/share-result";
 import { haptic } from "@/lib/haptics";
 import { cn } from "@/lib/utils";
 
@@ -23,6 +25,7 @@ export function FinalResultScreen({
   players: SessionPlayer[];
 }) {
   const { clearFinishedResult } = useSessionStore();
+  const [toast, setToast] = useState<string | null>(null);
 
   const rows = useMemo(() => buildLeaderboard(players), [players]);
   const podium = rows.slice(0, 3);
@@ -31,6 +34,15 @@ export function FinalResultScreen({
   const newSession = () => {
     haptic([20, 40]);
     clearFinishedResult();
+  };
+
+  const share = async () => {
+    haptic(12);
+    const outcome = await shareResultText(buildResultText(name, players));
+    if (outcome === "copied") setToast("Hasil disalin ke clipboard.");
+    else if (outcome === "failed")
+      setToast("Gagal membagikan hasil. Coba lagi.");
+    // 'shared' -> tidak perlu toast (share sheet HP sudah muncul)
   };
 
   return (
@@ -98,11 +110,23 @@ export function FinalResultScreen({
         )}
       </div>
 
-      <div className="border-t border-border p-4 pb-[calc(env(safe-area-inset-bottom)+1rem)]">
-        <Button size="lg" className="w-full" onClick={newSession}>
-          <RotateCcw size={18} /> Mulai Mabar Baru
+      <div className="flex gap-2 border-t border-border p-4 pb-[calc(env(safe-area-inset-bottom)+1rem)]">
+        {rows.length > 0 && (
+          <Button
+            size="lg"
+            variant="outline"
+            className="flex-1"
+            onClick={share}
+          >
+            <Share2 size={18} /> Bagikan
+          </Button>
+        )}
+        <Button size="lg" className="flex-1" onClick={newSession}>
+          <RotateCcw size={18} /> Mabar Baru
         </Button>
       </div>
+
+      <Toast message={toast} onClose={() => setToast(null)} />
     </div>
   );
 }
