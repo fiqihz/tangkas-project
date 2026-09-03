@@ -746,14 +746,15 @@ export const useSessionStore = create<SessionState>((set, get) => ({
 
   canUseFirstMatch() {
     const { players } = get();
-    // Belum ada satu pun match selesai (semua pemain 0x main) & minimal 4
-    // pemain active yang belum dialokasikan ke lapangan.
-    if (players.some((p) => p.gamesPlayed > 0)) return false;
+    // Boleh selama masih ADA minimal 4 pemain yang BELUM PERNAH main
+    // (gamesPlayed === 0), berstatus active, dan belum dialokasikan ke lapangan.
+    // Tidak lagi mensyaratkan SEMUA pemain 0x — jadi tetap berlaku walau
+    // sebagian pemain lain sudah/sedang main (mis. gelombang check-in kedua).
     const busy = get().busyPlayerIds();
-    const readyCount = players.filter(
-      (p) => p.status === "active" && !busy.has(p.id),
+    const freshReady = players.filter(
+      (p) => p.status === "active" && !busy.has(p.id) && p.gamesPlayed === 0,
     ).length;
-    return readyCount >= 4;
+    return freshReady >= 4;
   },
 
   async generateFirstMatch(courtId) {
@@ -775,7 +776,7 @@ export const useSessionStore = create<SessionState>((set, get) => ({
       return {
         ok: false,
         reason:
-          "Mode Match Pertama hanya untuk awal sesi (belum ada yang main) & butuh minimal 4 pemain sudah check-in.",
+          "Mode Match Pertama butuh minimal 4 pemain yang belum pernah main (0x) & sudah check-in. Pilih mode lain (Seimbang, Gendongan, dll).",
       };
     }
 
@@ -783,11 +784,14 @@ export const useSessionStore = create<SessionState>((set, get) => ({
     if (inFlight.has(key)) return { ok: false };
     inFlight.add(key);
     try {
-      // Urutkan pemain active (non-busy) berdasarkan waktu check-in paling awal.
-      // Level SENGAJA diabaikan sesuai kebutuhan mode ini.
+      // Hanya pemain yang BELUM PERNAH main (0x), active, non-busy — diurutkan
+      // berdasarkan waktu check-in paling awal. Level SENGAJA diabaikan.
       const busy = get().busyPlayerIds();
       const ordered = players
-        .filter((p) => p.status === "active" && !busy.has(p.id))
+        .filter(
+          (p) =>
+            p.status === "active" && !busy.has(p.id) && p.gamesPlayed === 0,
+        )
         .sort((a, b) => {
           const at = a.checkedInAt ?? "";
           const bt = b.checkedInAt ?? "";
@@ -796,7 +800,10 @@ export const useSessionStore = create<SessionState>((set, get) => ({
         });
 
       if (ordered.length < 4) {
-        return { ok: false, reason: "Pemain check-in kurang dari 4." };
+        return {
+          ok: false,
+          reason: "Pemain yang belum pernah main (0x) kurang dari 4.",
+        };
       }
 
       const four = ordered.slice(0, 4).map((p) => p.id);

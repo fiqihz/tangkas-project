@@ -274,6 +274,7 @@ export function CourtsScreen() {
       )}
       {modeForCourt && (
         <ModePickerSheet
+          firstMatchEligible={firstMatchEligible}
           onClose={() => setModeForCourt(null)}
           onPick={async (mode) => {
             const courtId = modeForCourt;
@@ -281,6 +282,22 @@ export function CourtsScreen() {
             const res = await generateLockedPreview(courtId, mode);
             if (!res.ok)
               setAutoFillMsg(res.reason ?? "Gagal menyusun preview.");
+            else setAutoFillMsg(null);
+          }}
+          onPickFirstMatch={async () => {
+            const courtId = modeForCourt;
+            // Jika belum cukup pemain 0x, JANGAN tutup sheet — tampilkan alert
+            // agar host bisa memilih mode lain (Seimbang, Gendongan, dll).
+            if (!firstMatchEligible) {
+              setAutoFillMsg(
+                "Mode Match Pertama tidak bisa dipakai: pemain yang belum pernah main (0x) kurang dari 4. Silakan pilih mode lain di bawah.",
+              );
+              return;
+            }
+            setModeForCourt(null);
+            const res = await generateFirstMatch(courtId);
+            if (!res.ok)
+              setAutoFillMsg(res.reason ?? "Gagal menyusun match pertama.");
             else setAutoFillMsg(null);
           }}
         />
@@ -672,10 +689,14 @@ const MODE_OPTIONS: {
 ];
 
 function ModePickerSheet({
+  firstMatchEligible,
   onPick,
+  onPickFirstMatch,
   onClose,
 }: {
+  firstMatchEligible: boolean;
   onPick: (mode: MatchMode) => void;
+  onPickFirstMatch: () => void;
   onClose: () => void;
 }) {
   return (
@@ -686,6 +707,36 @@ function ModePickerSheet({
           Mode menentukan cara pemain disusun untuk preview berikutnya.
         </p>
         <div className="mt-4 flex flex-col gap-2">
+          {/* Match Pertama: hanya untuk pemain yang belum pernah main (0x),
+              disusun murni berdasarkan urutan check-in (abaikan level). */}
+          <button
+            onClick={() => {
+              haptic(12);
+              onPickFirstMatch();
+            }}
+            aria-disabled={!firstMatchEligible}
+            className={cn(
+              "flex select-none items-start gap-3 rounded-xl border px-3.5 py-3 text-left transition-all active:scale-[0.99]",
+              firstMatchEligible
+                ? "border-primary/40 bg-primary/10 active:bg-primary/20"
+                : "border-border bg-secondary/40 opacity-60 active:bg-secondary",
+            )}
+          >
+            <span className="text-xl leading-none">🔢</span>
+            <span className="flex min-w-0 flex-col gap-0.5">
+              <span className="font-semibold">
+                Match Pertama (urut check-in)
+              </span>
+              <span className="text-xs text-muted-foreground">
+                {firstMatchEligible
+                  ? "Susun 4 pemain yang belum pernah main, urut kedatangan. Abaikan level."
+                  : "Butuh min. 4 pemain yang belum pernah main (0x)."}
+              </span>
+            </span>
+          </button>
+
+          <div className="my-1 h-px bg-border" />
+
           {MODE_OPTIONS.map((m) => (
             <button
               key={m.value}
