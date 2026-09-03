@@ -1,7 +1,7 @@
 "use client";
 
 import { useMemo, useState } from "react";
-import { Pencil } from "lucide-react";
+import { Clock, Pencil } from "lucide-react";
 import { LevelBadge } from "@/components/ui/level-badge";
 import type { Match, SessionPlayer } from "@/lib/domain/types";
 import { useSessionStore } from "@/lib/store/session-store";
@@ -101,6 +101,7 @@ function MatchHistoryRow({
   const unfinished = match.state === "unfinished";
   const aWon = match.winner === "a";
   const bWon = match.winner === "b";
+  const duration = formatMatchDuration(match.startedAt, match.finishedAt);
 
   return (
     <div className="rounded-xl border border-border bg-card p-3">
@@ -109,6 +110,11 @@ function MatchHistoryRow({
           <span className="rounded-md bg-primary/10 px-2 py-0.5 text-primary">
             Match ke-{matchNumber}
           </span>
+          {duration && (
+            <span className="flex items-center gap-1 rounded-md bg-secondary px-2 py-0.5 text-muted-foreground">
+              <Clock size={11} /> {duration}
+            </span>
+          )}
           {unfinished && (
             <span className="rounded-md bg-destructive/10 px-2 py-0.5 text-destructive">
               tidak selesai
@@ -167,4 +173,25 @@ function MatchHistoryRow({
       </div>
     </div>
   );
+}
+
+/**
+ * Durasi match dari startedAt s/d finishedAt, diformat ringkas:
+ *  - < 1 menit  -> "Xd" (detik)
+ *  - >= 1 menit -> "Nm" (menit, dibulatkan)
+ * Mengembalikan null bila salah satu waktu tak tersedia atau tidak valid
+ * (mis. match lama sebelum fitur timer, atau data ganjil).
+ */
+function formatMatchDuration(
+  startedAt?: string | null,
+  finishedAt?: string | null,
+): string | null {
+  if (!startedAt || !finishedAt) return null;
+  const start = new Date(startedAt).getTime();
+  const end = new Date(finishedAt).getTime();
+  if (Number.isNaN(start) || Number.isNaN(end)) return null;
+  const sec = Math.round((end - start) / 1000);
+  if (sec <= 0) return null;
+  if (sec < 60) return `${sec}d`;
+  return `${Math.round(sec / 60)}m`;
 }

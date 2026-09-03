@@ -3,7 +3,6 @@
 import { useMemo, useState } from "react";
 import {
   ChevronDown,
-  Clock,
   Coffee,
   LogIn,
   LogOut,
@@ -376,9 +375,8 @@ function QueueBadge({ queue }: { queue: QueueInfo }) {
       </span>
     );
   }
-  return (
-    <span className="flex items-center gap-1 rounded-md bg-amber-500/10 px-1.5 py-0.5 text-xs font-medium text-amber-600 dark:text-amber-400">
-      <Clock size={11} />#{queue.position} · ~{queue.etaMinutes}m
-    </span>
-  );
+  // Badge estimasi antrian ("#N · ~Mm") di-hide dulu — requirement estimasi
+  // belum matang. Logika queueInfo tetap dipertahankan agar mudah diaktifkan
+  // lagi nanti; cukup kembalikan tampilan waiting saat siap.
+  return null;
 }

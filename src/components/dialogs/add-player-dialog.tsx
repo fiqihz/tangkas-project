@@ -123,6 +123,7 @@ function RosterTab({
   onAdd: (p: {
     name: string;
     level: Level | null;
+    gender?: Gender | null;
     profileId?: string | null;
     status?: "registered";
   }) => Promise<void>;
@@ -167,6 +168,8 @@ function RosterTab({
       await onAdd({
         name: p.name,
         level: p.level,
+        // Bawa gender dari roster agar tidak perlu di-set ulang tiap mabar.
+        gender: p.gender,
         profileId: p.id,
         status: "registered",
       });
