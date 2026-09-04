@@ -11,6 +11,7 @@ import { Sheet, SheetContent, SheetTitle } from "@/components/ui/sheet";
 import { haptic } from "@/lib/haptics";
 import type { Gender, Level } from "@/lib/domain/types";
 import { useSessionStore } from "@/lib/store/session-store";
+import { useT } from "@/lib/store/settings-store";
 import { useProfiles } from "@/lib/store/use-profiles";
 import type { DbPlayerProfile } from "@/lib/supabase/types";
 import { cn } from "@/lib/utils";
@@ -32,20 +33,21 @@ export function AddPlayerDialog({
   const { addPlayer } = useSessionStore();
   const { profiles, create: createProfile, remove: removeProfile } =
     useProfiles();
+  const t = useT();
   const [tab, setTab] = useState<Tab>("roster");
 
   return (
     <Sheet open onOpenChange={(o) => !o && onClose()}>
       <SheetContent>
-        <SheetTitle className="text-lg font-bold">Tambah Pemain</SheetTitle>
+        <SheetTitle className="text-lg font-bold">{t("addPlayer.title")}</SheetTitle>
 
         {/* Tab switcher */}
         <div className="mt-3 flex gap-1 rounded-xl bg-secondary p-1">
           <TabBtn active={tab === "roster"} onClick={() => setTab("roster")}>
-            Dari Roster
+            {t("addPlayer.fromRoster")}
           </TabBtn>
           <TabBtn active={tab === "new"} onClick={() => setTab("new")}>
-            Pemain Baru
+            {t("addPlayer.newPlayer")}
           </TabBtn>
         </div>
 
@@ -130,6 +132,7 @@ function RosterTab({
   onDeleteProfile: (id: string) => Promise<void>;
   onClose: () => void;
 }) {
+  const t = useT();
   const [query, setQuery] = useState("");
   const [selected, setSelected] = useState<Set<string>>(new Set());
   const [saving, setSaving] = useState(false);
@@ -186,7 +189,7 @@ function RosterTab({
           className="absolute left-3 top-1/2 -translate-y-1/2 text-muted-foreground"
         />
         <Input
-          placeholder="Cari nama pemain…"
+          placeholder={t("addPlayer.searchRoster")}
           value={query}
           onChange={(e) => setQuery(e.target.value)}
           className="pl-9"
@@ -196,12 +199,12 @@ function RosterTab({
       <div className="flex max-h-[45vh] flex-col gap-1.5 overflow-y-auto">
         {available.length === 0 && (
           <p className="py-6 text-center text-sm text-muted-foreground">
-            Semua pemain roster sudah ditambahkan, atau roster masih kosong.
+            {t("addPlayer.rosterEmpty")}
           </p>
         )}
         {available.length > 0 && filtered.length === 0 && (
           <p className="py-6 text-center text-sm text-muted-foreground">
-            Tidak ada yang cocok dengan &quot;{query}&quot;.
+            {t("addPlayer.noMatch")} &quot;{query}&quot;
           </p>
         )}
         {filtered.map((p) => {
@@ -236,7 +239,7 @@ function RosterTab({
                       {p.name} <GenderBadge gender={p.gender} />
                     </div>
                     <div className="text-xs text-muted-foreground">
-                      🏸 {p.sessions_played}x mabar
+                      🏸 {t("addPlayer.sessionsPlayed", { n: p.sessions_played })}
                     </div>
                   </div>
                 </div>
@@ -248,7 +251,7 @@ function RosterTab({
                   setConfirmDelete(p);
                 }}
                 className="flex h-9 w-9 shrink-0 items-center justify-center rounded-lg text-muted-foreground active:scale-90 active:bg-destructive/10 active:text-destructive"
-                aria-label={`Hapus ${p.name} dari roster`}
+                aria-label={t("addPlayer.deleteAria", { name: p.name })}
               >
                 <Trash2 size={16} />
               </button>
@@ -263,10 +266,10 @@ function RosterTab({
         disabled={selected.size === 0 || saving}
       >
         {saving
-          ? "Menambahkan…"
+          ? t("addPlayer.adding")
           : selected.size > 0
-            ? `Tambah ${selected.size} pemain`
-            : "Pilih pemain dulu"}
+            ? t("addPlayer.addN", { n: selected.size })
+            : t("addPlayer.pickFirst")}
       </Button>
 
       {confirmDelete && (
@@ -276,12 +279,10 @@ function RosterTab({
         >
           <SheetContent>
             <SheetTitle className="text-lg font-bold">
-              Hapus {confirmDelete.name} dari roster?
+              {t("addPlayer.deleteTitle", { name: confirmDelete.name })}
             </SheetTitle>
             <p className="mt-2 text-sm text-muted-foreground">
-              Pemain ini akan dihapus permanen dari roster (daftar pemain
-              tersimpan). Riwayat mabar yang sudah lewat tetap aman. Tindakan ini
-              tidak bisa dibatalkan.
+              {t("addPlayer.deleteBody")}
             </p>
             <div className="mt-4 flex gap-2">
               <Button
@@ -290,7 +291,7 @@ function RosterTab({
                 onClick={() => setConfirmDelete(null)}
                 disabled={deleting}
               >
-                Batal
+                {t("common.cancel")}
               </Button>
               <Button
                 variant="destructive"
@@ -314,7 +315,7 @@ function RosterTab({
                   }
                 }}
               >
-                {deleting ? "Menghapus…" : "Hapus"}
+                {deleting ? t("addPlayer.deleting") : t("common.delete")}
               </Button>
             </div>
           </SheetContent>
@@ -337,6 +338,7 @@ function NewPlayerTab({
   ) => Promise<void>;
   onClose: () => void;
 }) {
+  const t = useT();
   const [name, setName] = useState("");
   const [level, setLevel] = useState<Level | null>(null);
   const [gender, setGender] = useState<Gender | null>(null);
@@ -357,37 +359,37 @@ function NewPlayerTab({
   return (
     <div className="mt-4 flex flex-col gap-4">
       <div>
-        <label className="mb-1 block text-sm font-medium">Nama pemain</label>
+        <label className="mb-1 block text-sm font-medium">{t("addPlayer.playerName")}</label>
         <Input
-          placeholder="Nama pemain"
+          placeholder={t("addPlayer.playerName")}
           value={name}
           onChange={(e) => setName(e.target.value)}
           autoFocus
         />
         {dup && (
           <p className="mt-1 text-xs text-destructive">
-            Nama ini sudah ada di sesi.
+            {t("addPlayer.dupName")}
           </p>
         )}
       </div>
 
       <div>
         <div className="mb-1 text-xs text-muted-foreground">
-          Level (opsional — bisa di-set nanti saat observasi)
+          {t("addPlayer.levelHint")}
         </div>
         <LevelSelect value={level} onChange={setLevel} size="sm" />
       </div>
 
       <div>
         <div className="mb-1 text-xs text-muted-foreground">
-          Gender (opsional — untuk mode campuran & ganda putri)
+          {t("addPlayer.genderHint")}
         </div>
         <GenderSelect value={gender} onChange={setGender} size="sm" />
       </div>
 
       <Button size="lg" onClick={save} disabled={!canSave || saving}>
         <UserPlus size={18} />
-        {saving ? "Menambahkan…" : "Tambah pemain"}
+        {saving ? t("addPlayer.adding") : t("addPlayer.submit")}
       </Button>
     </div>
   );

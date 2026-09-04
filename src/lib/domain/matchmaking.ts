@@ -135,14 +135,21 @@ export function generateMatch(
   currentRound: number,
   cfg: MatchmakingConfig = DEFAULT_CONFIG,
   mode: MatchMode = "balanced",
+  opts: { mustInclude?: ReadonlySet<string> } = {},
 ): ProposedMatch | null {
   if (pool.length < 4) return null;
+
+  const mustInclude = opts.mustInclude ?? new Set<string>();
 
   const candidates = pickCandidatePlayers(pool, currentRound, cfg);
   // Batasi ruang pencarian pada kandidat teratas untuk menjaga performa.
   // Untuk mode dengan constraint komposisi (gender/gendongan/kelas), lebarkan
   // window agar lebih mungkin menemukan kombinasi valid.
-  const windowSize = mode === "balanced" ? 10 : 14;
+  let windowSize = mode === "balanced" ? 10 : 14;
+  // Pastikan window cukup besar untuk memuat SEMUA pemain wajib (mustInclude),
+  // walau ada yang tersortir jauh di belakang (mis. pemain sedang main yang
+  // di-reserve). Tanpa ini, kombinasi valid yang memuat mereka bisa terpotong.
+  windowSize = Math.max(windowSize, pool.length);
   const window = candidates.slice(0, Math.min(candidates.length, windowSize));
 
   let best: (ProposedMatch & { queuePenalty: number }) | null = null;
@@ -153,6 +160,19 @@ export function generateMatch(
 
   for (const [i, j, k, l] of tried) {
     const four = [window[i], window[j], window[k], window[l]];
+    // Wajib memuat semua pemain di mustInclude (mis. pemain menunggu yang
+    // harus diprioritaskan). Kombinasi yang tidak memuat mereka di-skip.
+    if (mustInclude.size > 0) {
+      const ids = new Set(four.map((p) => p.id));
+      let ok = true;
+      for (const id of mustInclude) {
+        if (!ids.has(id)) {
+          ok = false;
+          break;
+        }
+      }
+      if (!ok) continue;
+    }
     const split = bestSplitForFour(four, history, cfg, mode);
     if (!split) continue;
 

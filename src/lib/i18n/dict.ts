@@ -371,6 +371,46 @@ export const DICT = {
   // Level badge
   "level.notSet": { id: "belum di-set", en: "not set" },
 
+  // Gender
+  "gender.male": { id: "Cowok", en: "Male" },
+  "gender.female": { id: "Cewek", en: "Female" },
+
+  // Add player dialog
+  "addPlayer.title": { id: "Tambah Pemain", en: "Add Player" },
+  "addPlayer.fromRoster": { id: "Dari Roster", en: "From Roster" },
+  "addPlayer.newPlayer": { id: "Pemain Baru", en: "New Player" },
+  "addPlayer.searchRoster": { id: "Cari nama pemain…", en: "Search player name…" },
+  "addPlayer.rosterEmpty": {
+    id: "Semua pemain roster sudah ditambahkan, atau roster masih kosong.",
+    en: "All roster players are already added, or the roster is empty.",
+  },
+  "addPlayer.noMatch": { id: "Tidak ada yang cocok.", en: "No matches." },
+  "addPlayer.sessionsPlayed": { id: "{n}x mabar", en: "{n} sessions" },
+  "addPlayer.adding": { id: "Menambahkan…", en: "Adding…" },
+  "addPlayer.addN": { id: "Tambah {n} pemain", en: "Add {n} players" },
+  "addPlayer.pickFirst": { id: "Pilih pemain dulu", en: "Select players first" },
+  "addPlayer.deleteAria": { id: "Hapus {name} dari roster", en: "Remove {name} from roster" },
+  "addPlayer.deleteTitle": {
+    id: "Hapus {name} dari roster?",
+    en: "Remove {name} from roster?",
+  },
+  "addPlayer.deleteBody": {
+    id: "Pemain ini akan dihapus permanen dari roster (daftar pemain tersimpan). Riwayat mabar yang sudah lewat tetap aman. Tindakan ini tidak bisa dibatalkan.",
+    en: "This player will be permanently removed from the roster (saved player list). Past session history stays safe. This cannot be undone.",
+  },
+  "addPlayer.deleting": { id: "Menghapus…", en: "Deleting…" },
+  "addPlayer.playerName": { id: "Nama pemain", en: "Player name" },
+  "addPlayer.dupName": { id: "Nama ini sudah ada di sesi.", en: "This name already exists in the session." },
+  "addPlayer.levelHint": {
+    id: "Level (opsional — bisa di-set nanti saat match berjalan)",
+    en: "Level (optional — can be set later during the match)",
+  },
+  "addPlayer.genderHint": {
+    id: "Gender (opsional — untuk mode campuran & ganda putri)",
+    en: "Gender (optional — for mixed & ladies doubles modes)",
+  },
+  "addPlayer.submit": { id: "Tambah pemain", en: "Add player" },
+
   // Read-only result (finished session view)
   "result.readonly": {
     id: "Hasil akhir (read-only) · aktifkan lagi untuk edit",

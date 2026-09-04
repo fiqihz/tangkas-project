@@ -748,17 +748,37 @@ export const useSessionStore = create<SessionState>((set, get) => ({
     const busy = get().busyPlayerIds();
     let pool = availablePool(players, { requireLevel: true, excludeIds: busy });
 
-    // Poin 5: bila pemain MENUNGGU kurang dari 4, "reserve" pemain yang SEDANG
-    // MAIN dengan durasi match paling lama (startedAt paling awal). Pemain ini
-    // TIDAK dicabut dari match berjalan — hanya di-booking untuk preview ini,
-    // dan akan benar-benar naik saat match asalnya selesai.
-    if (pool.length < 4) {
+    // Pemain MENUNGGU (tidak sedang main/preview) yang siap dipakai. Mereka
+    // WAJIB diprioritaskan masuk match berikutnya — jangan sampai kalah oleh
+    // pemain yang di-reserve dari lapangan lain.
+    const waitingIds = new Set(pool.map((p) => p.id));
+
+    // Pemain menunggu yang BELUM di-set level (active, non-busy, level null).
+    // Mereka "menunggu" tapi belum bisa ikut auto-matchmaking. Kalau ada, JANGAN
+    // reserve pemain yang sedang main — beri tahu host untuk set level dulu,
+    // supaya tidak salah mengambil pemain lapangan lain padahal ada yg menunggu.
+    const waitingNoLevel = players.filter(
+      (p) => p.status === "active" && p.level === null && !busy.has(p.id),
+    ).length;
+
+    // Poin 5: bila pemain MENUNGGU (yang sudah ber-level) kurang dari 4,
+    // "reserve" pemain yang SEDANG MAIN dengan durasi match paling lama untuk
+    // MENGISI SISA slot saja — TAPI hanya bila tidak ada pemain menunggu yang
+    // sekadar belum di-set level. Pemain reserve tidak dicabut dari match
+    // berjalan, hanya di-booking sampai match asalnya selesai.
+    if (pool.length < 4 && waitingNoLevel === 0) {
       const reserved = reservablePlayingPlayers(matches, players).filter(
-        (p) => p.level !== null && !pool.some((q) => q.id === p.id),
+        (p) => p.level !== null && !waitingIds.has(p.id),
       );
       const need = 4 - pool.length;
       pool = [...pool, ...reserved.slice(0, need)];
     }
+    // mustInclude = semua pemain menunggu (maks 4). Bila menunggu >= 4, biarkan
+    // matchmaking bebas memilih 4 terbaik dari antrian (jangan paksa semua).
+    const mustInclude =
+      waitingIds.size > 0 && waitingIds.size < 4
+        ? waitingIds
+        : new Set<string>();
 
     if (pool.length < 4) {
       // Bangun penjelasan kenapa pemain kurang.
@@ -779,7 +799,9 @@ export const useSessionStore = create<SessionState>((set, get) => ({
     }
 
     const round = session.current_round + 1;
-    const prop = generateMatch(pool, history, round, undefined, mode);
+    const prop = generateMatch(pool, history, round, undefined, mode, {
+      mustInclude,
+    });
     if (!prop) {
       // Kasus dead-end paling umum di mode non-ladies: sisa pool kebanyakan
       // Newbie. Tiap Newbie butuh 1 partner non-Newbie (Newbie+Newbie dilarang),
