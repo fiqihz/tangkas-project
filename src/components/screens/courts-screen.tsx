@@ -30,6 +30,7 @@ import type {
   SessionPlayer,
 } from "@/lib/domain/types";
 import { useSessionStore } from "@/lib/store/session-store";
+import { useT } from "@/lib/store/settings-store";
 import { haptic } from "@/lib/haptics";
 import { cn } from "@/lib/utils";
 import { FinishMatchDialog } from "@/components/dialogs/finish-match-dialog";
@@ -53,6 +54,7 @@ export function CourtsScreen() {
     setPlayerLevel,
     setPlayerGender,
   } = useSessionStore();
+  const t = useT();
   // Apakah mode "Match Pertama (urut check-in)" boleh dipakai saat ini.
   const firstMatchEligible = canUseFirstMatch();
   const [autoFillMsg, setAutoFillMsg] = useState<string | null>(null);
@@ -200,6 +202,7 @@ export function CourtsScreen() {
                       <LockedPreview
                         preview={lockedPreview}
                         byId={byId}
+                        playingIds={playingIds}
                         onTapPlayer={(playerId) =>
                           setPlayerAction({ match: lockedPreview, playerId })
                         }
@@ -209,7 +212,7 @@ export function CourtsScreen() {
                 ) : (
                   <div className="flex flex-col gap-3">
                     <p className="text-sm text-muted-foreground">
-                      Lapangan kosong.
+                      {t("courts.emptyCourt")}
                     </p>
                     {firstMatchEligible && (
                       <Button
@@ -234,7 +237,7 @@ export function CourtsScreen() {
                         setManualFor(court.id);
                       }}
                     >
-                      <Pencil size={16} /> Isi manual
+                      <Pencil size={16} /> {t("courts.fillManual")}
                     </Button>
                   </div>
                 )}
@@ -244,7 +247,7 @@ export function CourtsScreen() {
         );
       })}
 
-      <Fab onClick={addCourt} icon={<Plus size={22} />} label="Lapangan" />
+      <Fab onClick={addCourt} icon={<Plus size={22} />} label={t("courts.addCourt")} />
 
       {finishFor && (
         <FinishMatchDialog
@@ -439,6 +442,7 @@ function MatchView({
   onStart: () => void;
   onTapPlayer: (playerId: string) => void;
 }) {
+  const t = useT();
   const isProposed = match.state === "proposed";
   return (
     <div className="flex flex-col gap-3">
@@ -476,7 +480,7 @@ function MatchView({
       </div>
       {isProposed ? (
         <Button variant="info" onClick={onStart}>
-          <Play size={16} /> Mulai Main
+          <Play size={16} /> {t("courts.startMatch")}
         </Button>
       ) : (
         <div className="flex gap-2">
@@ -484,12 +488,12 @@ function MatchView({
             variant="info"
             className="flex-1"
             onClick={onAutoFill}
-            disabled={hasPreview}
           >
-            <Wand2 size={16} /> Auto-fill
+            <Wand2 size={16} />{" "}
+            {hasPreview ? t("courts.regenerate") : t("courts.smartMatchmaking")}
           </Button>
           <Button variant="warning" className="flex-1" onClick={onFinish}>
-            Finish &amp; Skor
+            {t("courts.finishScore")}
           </Button>
         </div>
       )}
@@ -500,10 +504,12 @@ function MatchView({
 function LockedPreview({
   preview,
   byId,
+  playingIds,
   onTapPlayer,
 }: {
   preview: Match;
   byId: Map<string, SessionPlayer>;
+  playingIds: Set<string>;
   onTapPlayer: (playerId: string) => void;
 }) {
   const ids = [...preview.teamA.playerIds, ...preview.teamB.playerIds];
@@ -512,10 +518,13 @@ function LockedPreview({
     const st = byId.get(id)?.status;
     return st === "resting" || st === "left";
   });
+  // Poin 5: pemain preview yang masih main di lapangan lain (di-reserve).
+  const reserved = ids.filter((id) => playingIds.has(id));
 
   const PlayerChip = ({ id }: { id: string }) => {
     const p = byId.get(id);
     const bad = p?.status === "resting" || p?.status === "left";
+    const isReserved = playingIds.has(id);
     return (
       <button
         onClick={() => {
@@ -526,13 +535,20 @@ function LockedPreview({
           "flex min-h-[44px] w-full select-none flex-col gap-0.5 rounded-lg border px-2 py-1.5 text-left transition-all active:scale-[0.98]",
           bad
             ? "border-destructive/50 bg-destructive/10"
-            : "border-border bg-background active:bg-secondary",
+            : isReserved
+              ? "border-amber-400/60 bg-amber-50 dark:border-amber-700 dark:bg-amber-950/40"
+              : "border-border bg-background active:bg-secondary",
         )}
       >
         <span className="flex items-center gap-1 truncate text-sm font-medium">
           {p?.name ?? "?"}
           <GenderBadge gender={p?.gender ?? null} />
           {bad && <span className="shrink-0 text-xs text-destructive">⚠️</span>}
+          {!bad && isReserved && (
+            <span className="shrink-0 rounded bg-amber-500/15 px-1 text-[10px] font-medium text-amber-600 dark:text-amber-400">
+              main
+            </span>
+          )}
         </span>
         <LevelBadge level={p?.level ?? null} className="w-fit shrink-0" />
       </button>
@@ -563,6 +579,12 @@ function LockedPreview({
         <p className="mt-2 text-xs text-destructive">
           ⚠️ {problem.map((id) => byId.get(id)?.name).join(", ")} sudah
           istirahat/pulang. Ganti dulu sebelum match ini mulai.
+        </p>
+      )}
+      {reserved.length > 0 && (
+        <p className="mt-2 text-xs text-amber-600 dark:text-amber-400">
+          ⏳ {reserved.map((id) => byId.get(id)?.name).join(", ")} masih main di
+          lapangan lain (di-booking). Bisa mulai setelah match mereka selesai.
         </p>
       )}
     </div>

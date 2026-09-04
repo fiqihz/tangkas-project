@@ -5,7 +5,6 @@ import {
   ChevronDown,
   Coffee,
   LogIn,
-  LogOut,
   Play,
   Plus,
   Search,
@@ -20,15 +19,17 @@ import { Fab } from "@/components/ui/fab";
 import type { Gender, Level, PlayerStatus, SessionPlayer } from "@/lib/domain/types";
 import { sortByQueuePriority } from "@/lib/domain/queue";
 import { useSessionStore } from "@/lib/store/session-store";
+import { useT } from "@/lib/store/settings-store";
+import type { DictKey } from "@/lib/i18n/dict";
 import { haptic } from "@/lib/haptics";
 import { cn } from "@/lib/utils";
 import { AddPlayerDialog } from "@/components/dialogs/add-player-dialog";
 
-const STATUS_LABEL: Record<PlayerStatus, string> = {
-  registered: "Belum check-in",
-  active: "Main (Active)",
-  resting: "Istirahat",
-  left: "Pulang",
+const STATUS_LABEL_KEY: Record<PlayerStatus, DictKey> = {
+  registered: "players.status.registered",
+  active: "players.status.active",
+  resting: "players.status.resting",
+  left: "players.status.left",
 };
 
 /** Asumsi durasi rata-rata satu match (menit) untuk estimasi giliran. */
@@ -46,6 +47,7 @@ type QueueInfo =
 export function PlayersScreen() {
   const { players, matches, courts, setPlayerLevel, setPlayerStatus, setPlayerGender } =
     useSessionStore();
+  const t = useT();
   const [expanded, setExpanded] = useState<string | null>(null);
   const [adding, setAdding] = useState(false);
   const [query, setQuery] = useState("");
@@ -139,7 +141,7 @@ export function PlayersScreen() {
             className="absolute left-3 top-1/2 -translate-y-1/2 text-muted-foreground"
           />
           <Input
-            placeholder="Cari nama pemain…"
+            placeholder={t("players.searchPlaceholder")}
             value={query}
             onChange={(e) => setQuery(e.target.value)}
             className="pl-9"
@@ -173,7 +175,7 @@ export function PlayersScreen() {
                     status === "left" && "bg-destructive",
                   )}
                 />
-                {STATUS_LABEL[status]} ({grouped[status].length})
+                {t(STATUS_LABEL_KEY[status])} ({grouped[status].length})
                 <ChevronDown
                   size={16}
                   className={cn(
@@ -212,7 +214,7 @@ export function PlayersScreen() {
       <Fab
         onClick={() => setAdding(true)}
         icon={<Plus size={22} />}
-        label="Pemain"
+        label={t("players.addFab")}
       />
 
       {adding && (
@@ -242,6 +244,7 @@ function PlayerRow({
   onSetGender: (g: Gender) => void;
   onSetStatus: (s: PlayerStatus) => void;
 }) {
+  const t = useT();
   return (
     <Card>
       <CardContent className="pt-3">
@@ -288,32 +291,29 @@ function PlayerRow({
               />
             </div>
             <div className="flex flex-wrap gap-2">
-              {player.status !== "active" && (
+              {/* Belum check-in / pulang -> tombol untuk mengaktifkan. */}
+              {(player.status === "registered" || player.status === "left") && (
                 <Button size="sm" onClick={() => onSetStatus("active")}>
-                  <LogIn size={14} /> Check-in / Aktif
+                  <LogIn size={14} /> {t("players.checkIn")}
                 </Button>
               )}
+              {/* Poin 4: toggle Active/Inactive menggantikan tombol Istirahat.
+                  Fungsinya tetap sama — Active -> set resting (Inactive),
+                  resting -> set active (Active). Tombol "Pulang" (status left)
+                  di-hide dulu; logic setPlayerStatus("left") tetap ada agar
+                  mudah diaktifkan lagi bila dibutuhkan. */}
               {player.status === "active" && (
                 <Button
                   size="sm"
                   variant="outline"
                   onClick={() => onSetStatus("resting")}
                 >
-                  <Coffee size={14} /> Istirahat
-                </Button>
-              )}
-              {player.status !== "left" && (
-                <Button
-                  size="sm"
-                  variant="destructive"
-                  onClick={() => onSetStatus("left")}
-                >
-                  <LogOut size={14} /> Pulang
+                  <Coffee size={14} /> {t("players.setInactive")}
                 </Button>
               )}
               {player.status === "resting" && (
                 <Button size="sm" onClick={() => onSetStatus("active")}>
-                  <Play size={14} /> Main lagi
+                  <Play size={14} /> {t("players.setActive")}
                 </Button>
               )}
             </div>

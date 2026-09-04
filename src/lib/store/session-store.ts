@@ -160,6 +160,43 @@ function byIdMap(players: SessionPlayer[]) {
  */
 const inFlight = new Set<string>();
 
+/**
+ * Poin 5: pemain yang SEDANG MAIN (state playing) yang bisa "di-reserve" untuk
+ * mengisi preview saat pemain menunggu kurang dari 4. Diurutkan berdasarkan
+ * durasi match paling lama (startedAt paling awal) — pemain yang matchnya
+ * sudah berjalan paling lama diprioritaskan karena kemungkinan besar akan
+ * selesai lebih dulu. Pemain tetap ada di match berjalannya (tidak dicabut);
+ * ini hanya booking untuk match berikutnya.
+ */
+function reservablePlayingPlayers(
+  matches: Match[],
+  players: SessionPlayer[],
+): SessionPlayer[] {
+  const byId = new Map(players.map((p) => [p.id, p]));
+  const playing = matches
+    .filter((m) => m.state === "playing")
+    .slice()
+    .sort((a, b) => {
+      const at = a.startedAt ?? "";
+      const bt = b.startedAt ?? "";
+      // startedAt paling awal (durasi terlama) didahulukan.
+      if (at !== bt) return at.localeCompare(bt);
+      return a.id.localeCompare(b.id);
+    });
+  const out: SessionPlayer[] = [];
+  const seen = new Set<string>();
+  for (const m of playing) {
+    for (const id of [...m.teamA.playerIds, ...m.teamB.playerIds]) {
+      if (seen.has(id)) continue;
+      seen.add(id);
+      const p = byId.get(id);
+      // Hanya pemain yang masih active (belum resting/left) yang layak di-reserve.
+      if (p && p.status === "active") out.push(p);
+    }
+  }
+  return out;
+}
+
 // --- Realtime (level modul; bukan state React) ---------------------------
 /** Fungsi untuk menghentikan langganan realtime yang sedang aktif. */
 let realtimeUnsub: (() => void) | null = null;
@@ -620,6 +657,32 @@ export const useSessionStore = create<SessionState>((set, get) => ({
     if (inFlight.has(key)) return; // cegah dobel-tap
     inFlight.add(key);
     try {
+      // Poin 5 guard: pemain bisa "di-reserve" ke preview walau masih main di
+      // lapangan lain. Preview seperti itu tidak boleh dimulai selama pemainnya
+      // belum selesai — kalau dipaksa, pemain jadi ada di 2 match playing.
+      const { matches } = get();
+      const toStart = matches.find((m) => m.id === matchId);
+      if (toStart) {
+        const ids = new Set([
+          ...toStart.teamA.playerIds,
+          ...toStart.teamB.playerIds,
+        ]);
+        const stillPlaying = matches.some(
+          (m) =>
+            m.id !== matchId &&
+            m.state === "playing" &&
+            [...m.teamA.playerIds, ...m.teamB.playerIds].some((id) =>
+              ids.has(id),
+            ),
+        );
+        if (stillPlaying) {
+          set({
+            actionError:
+              "Belum bisa mulai — ada pemain di preview ini yang masih main di lapangan lain. Selesaikan match mereka dulu, atau ganti pemainnya.",
+          });
+          return;
+        }
+      }
       // set state 'playing' + catat started_at untuk timer durasi match.
       await repo.startMatchPlaying(matchId);
       await get().refresh();
@@ -648,25 +711,55 @@ export const useSessionStore = create<SessionState>((set, get) => ({
    * sudah ada proposed di lapangan itu.
    */
   async generateLockedPreview(courtId, mode = "balanced") {
-    const { session, matches, players, courts } = get();
-    if (!session || !courtId) return { ok: false };
+    const first = get();
+    if (!first.session || !courtId) return { ok: false };
 
-    // sudah ada proposed di lapangan ini -> jangan buat dobel
-    if (matches.some((m) => m.courtId === courtId && m.state === "proposed")) {
-      return { ok: false };
-    }
-
-    // Guard dobel-tap: dua tap simultan bisa lolos cek "sudah ada proposed"
-    // di atas (keduanya baca state lama) -> tanpa guard bisa buat 2 preview.
-    // finally memastikan key selalu dibersihkan walau ada banyak return di tengah.
+    // Guard dobel-tap: dua tap simultan bisa lolos cek di bawah (keduanya baca
+    // state lama). finally memastikan key selalu dibersihkan walau ada banyak
+    // return di tengah.
     const key = `genPreview:${courtId}`;
     if (inFlight.has(key)) return { ok: false };
     inFlight.add(key);
     try {
+    // Poin 3: "Susun Ulang". Bila sudah ada preview (proposed) di lapangan ini,
+    // hapus dulu supaya bisa disusun ulang dengan mode baru. Menghapus proposed
+    // otomatis membebaskan pemainnya (busyPlayerIds dihitung dari state match),
+    // termasuk edit manual yang sebelumnya dilakukan host — memang di-timpa.
+    const existingProposed = first.matches.find(
+      (m) => m.courtId === courtId && m.state === "proposed",
+    );
+    if (existingProposed) {
+      try {
+        await repo.deleteMatch(existingProposed.id);
+        await get().refresh();
+      } catch (e) {
+        const reason = `Gagal menyusun ulang preview: ${describe(e)}.`;
+        set({ actionError: reason });
+        return { ok: false, reason };
+      }
+    }
+
+    // Baca ulang state setelah kemungkinan penghapusan proposed di atas.
+    const { session, matches, players, courts } = get();
+    if (!session) return { ok: false };
+
     const history = MatchHistory.fromMatches(matches);
     // Eksklusif: kecualikan semua pemain yang sudah di proposed/playing mana pun.
     const busy = get().busyPlayerIds();
-    const pool = availablePool(players, { requireLevel: true, excludeIds: busy });
+    let pool = availablePool(players, { requireLevel: true, excludeIds: busy });
+
+    // Poin 5: bila pemain MENUNGGU kurang dari 4, "reserve" pemain yang SEDANG
+    // MAIN dengan durasi match paling lama (startedAt paling awal). Pemain ini
+    // TIDAK dicabut dari match berjalan — hanya di-booking untuk preview ini,
+    // dan akan benar-benar naik saat match asalnya selesai.
+    if (pool.length < 4) {
+      const reserved = reservablePlayingPlayers(matches, players).filter(
+        (p) => p.level !== null && !pool.some((q) => q.id === p.id),
+      );
+      const need = 4 - pool.length;
+      pool = [...pool, ...reserved.slice(0, need)];
+    }
+
     if (pool.length < 4) {
       // Bangun penjelasan kenapa pemain kurang.
       const notCheckedIn = players.filter(
