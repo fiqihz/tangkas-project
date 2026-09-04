@@ -31,6 +31,7 @@ import type {
 } from "@/lib/domain/types";
 import { useSessionStore } from "@/lib/store/session-store";
 import { useT } from "@/lib/store/settings-store";
+import type { DictKey } from "@/lib/i18n/dict";
 import { haptic } from "@/lib/haptics";
 import { cn } from "@/lib/utils";
 import { FinishMatchDialog } from "@/components/dialogs/finish-match-dialog";
@@ -114,8 +115,11 @@ export function CourtsScreen() {
     <div className="flex flex-col gap-4">
       <div className="flex items-center justify-between">
         <span className="text-sm text-muted-foreground">
-          {activePlayers.length} aktif · {playingCount} main · {waiting.length}{" "}
-          menunggu
+          {t("courts.summary", {
+            active: activePlayers.length,
+            playing: playingCount,
+            waiting: waiting.length,
+          })}
         </span>
       </div>
 
@@ -133,7 +137,7 @@ export function CourtsScreen() {
 
       {courts.length === 0 && (
         <p className="py-8 text-center text-sm text-muted-foreground">
-          Belum ada lapangan. Tap tombol + untuk menambah.
+          {t("courts.emptyNoCourt")}
         </p>
       )}
 
@@ -161,7 +165,7 @@ export function CourtsScreen() {
                       setRenameFor({ id: court.id, label: court.label });
                     }}
                     className="flex select-none items-center gap-1.5 rounded-lg py-1 pr-2 font-semibold active:opacity-70"
-                    aria-label="Ubah nama lapangan"
+                    aria-label={t("courts.renameCourt")}
                   >
                     {court.label}
                     <Pencil size={13} className="text-muted-foreground" />
@@ -172,7 +176,7 @@ export function CourtsScreen() {
                       setDeleteFor({ id: court.id, label: court.label });
                     }}
                     className="flex h-9 w-9 items-center justify-center rounded-lg text-muted-foreground active:scale-90 active:bg-secondary"
-                    aria-label="Hapus lapangan"
+                    aria-label={t("courts.deleteCourt")}
                   >
                     <Trash2 size={16} />
                   </button>
@@ -227,7 +231,7 @@ export function CourtsScreen() {
                           else setAutoFillMsg(null);
                         }}
                       >
-                        <ListOrdered size={16} /> Match Pertama (urut check-in)
+                        <ListOrdered size={16} /> {t("courts.firstMatch")}
                       </Button>
                     )}
                     <Button
@@ -448,14 +452,14 @@ function MatchView({
     <div className="flex flex-col gap-3">
       <div className="flex items-center gap-1.5 text-xs font-medium">
         <span className="rounded-md bg-primary/10 px-2 py-0.5 text-primary">
-          Match ke-{matchNumber}
+          {t("courts.matchNo", { n: matchNumber })}
         </span>
         <span
           className={
             isProposed ? "text-amber-600" : "text-muted-foreground"
           }
         >
-          {isProposed ? "belum mulai" : "sedang berjalan"}
+          {isProposed ? t("courts.notStarted") : t("courts.running")}
         </span>
         {!isProposed && match.startedAt && (
           <MatchTimer startedAt={match.startedAt} />
@@ -464,7 +468,7 @@ function MatchView({
       <div className="flex items-stretch gap-2">
         <TeamBlock
           ids={match.teamA.playerIds}
-          label="Tim A"
+          label={t("courts.teamA")}
           byId={byId}
           onTapPlayer={onTapPlayer}
         />
@@ -473,7 +477,7 @@ function MatchView({
         </div>
         <TeamBlock
           ids={match.teamB.playerIds}
-          label="Tim B"
+          label={t("courts.teamB")}
           byId={byId}
           onTapPlayer={onTapPlayer}
         />
@@ -512,6 +516,7 @@ function LockedPreview({
   playingIds: Set<string>;
   onTapPlayer: (playerId: string) => void;
 }) {
+  const t = useT();
   const ids = [...preview.teamA.playerIds, ...preview.teamB.playerIds];
   // Warning bila ada pemain preview yang statusnya sudah rest/left.
   const problem = ids.filter((id) => {
@@ -558,7 +563,7 @@ function LockedPreview({
   return (
     <div className="mt-3 rounded-xl border border-dashed border-border p-2.5">
       <div className="mb-2 flex items-center gap-1.5 text-xs font-medium text-muted-foreground">
-        ⏭️ Main berikutnya (terkunci — tap pemain untuk ganti)
+        {t("courts.nextLocked")}
       </div>
       <div className="flex items-stretch gap-2">
         <div className="flex min-w-0 flex-1 flex-col gap-1.5">
@@ -607,6 +612,7 @@ function CompleteInfoDialog({
   onDone: () => void;
   onClose: () => void;
 }) {
+  const t = useT();
   const ids = [...match.teamA.playerIds, ...match.teamB.playerIds];
   const playersInMatch = ids
     .map((id) => byId.get(id))
@@ -620,11 +626,10 @@ function CompleteInfoDialog({
     <Sheet open onOpenChange={(o) => !o && onClose()}>
       <SheetContent>
         <SheetTitle className="text-lg font-bold">
-          Lengkapi data pemain
+          {t("completeInfo.title")}
         </SheetTitle>
         <p className="mt-1 text-sm text-muted-foreground">
-          Match ini sudah selesai — set <b>level</b> & <b>gender</b> pemain yang
-          belum terisi sebelum input skor. Data tersimpan ke roster.
+          {t("completeInfo.body")}
         </p>
 
         <div className="mt-4 flex max-h-[55vh] flex-col gap-3 overflow-y-auto">
@@ -645,13 +650,13 @@ function CompleteInfoDialog({
                   <LevelBadge level={p.level} />
                   <GenderBadge gender={p.gender} />
                   {done && (
-                    <span className="ml-auto text-xs text-primary">✓ lengkap</span>
+                    <span className="ml-auto text-xs text-primary">{t("completeInfo.done")}</span>
                   )}
                 </div>
                 {p.level === null && (
                   <div className="mb-2">
                     <div className="mb-1 text-xs text-muted-foreground">
-                      Set level
+                      {t("players.setLevel")}
                     </div>
                     <LevelSelect
                       value={p.level}
@@ -666,7 +671,7 @@ function CompleteInfoDialog({
                 {p.gender === null && (
                   <div>
                     <div className="mb-1 text-xs text-muted-foreground">
-                      Set gender
+                      {t("players.setGender")}
                     </div>
                     <GenderSelect
                       value={p.gender}
@@ -685,7 +690,7 @@ function CompleteInfoDialog({
 
         <div className="mt-4 flex gap-2">
           <Button variant="outline" className="flex-1" onClick={onClose}>
-            Batal
+            {t("common.cancel")}
           </Button>
           <Button
             variant="warning"
@@ -696,7 +701,7 @@ function CompleteInfoDialog({
             }}
             disabled={!allComplete}
           >
-            {allComplete ? "Lanjut ke Skor" : "Lengkapi dulu"}
+            {allComplete ? t("completeInfo.continue") : t("completeInfo.incomplete")}
           </Button>
         </div>
       </SheetContent>
@@ -706,40 +711,15 @@ function CompleteInfoDialog({
 
 const MODE_OPTIONS: {
   value: MatchMode;
-  label: string;
-  desc: string;
+  labelKey: DictKey;
+  descKey: DictKey;
   emoji: string;
 }[] = [
-  {
-    value: "balanced",
-    label: "Seimbang",
-    emoji: "⚖️",
-    desc: "Default. Susun tim seimbang, minimalkan selisih level.",
-  },
-  {
-    value: "mixed",
-    label: "Campuran",
-    emoji: "👫",
-    desc: "Ganda campuran: tiap tim 1 cowok + 1 cewek (best-effort).",
-  },
-  {
-    value: "ladies",
-    label: "Ganda Putri",
-    emoji: "👩",
-    desc: "Semua pemain cewek. Aturan Newbie+Newbie dilonggarkan.",
-  },
-  {
-    value: "gendongan",
-    label: "Gendongan",
-    emoji: "🤝",
-    desc: "Tiap tim 1 kuat + 1 lemah, dua tim dibuat seimbang.",
-  },
-  {
-    value: "kelas",
-    label: "Sesuai Kelas",
-    emoji: "🎯",
-    desc: "Pasangkan pemain dengan level yang sama.",
-  },
+  { value: "balanced", labelKey: "mode.balanced", emoji: "⚖️", descKey: "mode.balancedDesc" },
+  { value: "mixed", labelKey: "mode.mixed", emoji: "👫", descKey: "mode.mixedDesc" },
+  { value: "ladies", labelKey: "mode.ladies", emoji: "👩", descKey: "mode.ladiesDesc" },
+  { value: "gendongan", labelKey: "mode.gendongan", emoji: "🤝", descKey: "mode.gendonganDesc" },
+  { value: "kelas", labelKey: "mode.kelas", emoji: "🎯", descKey: "mode.kelasDesc" },
 ];
 
 function ModePickerSheet({
@@ -757,13 +737,14 @@ function ModePickerSheet({
   // memenuhi syarat — agar terlihat tanpa tertutup drawer, dan host tetap
   // bisa memilih mode lain di daftar bawahnya.
   const [firstMatchAlert, setFirstMatchAlert] = useState(false);
+  const t = useT();
 
   return (
     <Sheet open onOpenChange={(o) => !o && onClose()}>
       <SheetContent>
-        <SheetTitle className="text-lg font-bold">Pilih Mode Match</SheetTitle>
+        <SheetTitle className="text-lg font-bold">{t("mode.title")}</SheetTitle>
         <p className="mt-1 text-sm text-muted-foreground">
-          Mode menentukan cara pemain disusun untuk preview berikutnya.
+          {t("mode.subtitle")}
         </p>
         <div className="mt-4 flex flex-col gap-2">
           {/* Match Pertama: hanya untuk pemain yang belum pernah main (0x),
@@ -786,21 +767,18 @@ function ModePickerSheet({
           >
             <span className="text-xl leading-none">🔢</span>
             <span className="flex min-w-0 flex-col gap-0.5">
-              <span className="font-semibold">
-                Match Pertama (urut check-in)
-              </span>
+              <span className="font-semibold">{t("mode.firstMatch")}</span>
               <span className="text-xs text-muted-foreground">
                 {firstMatchEligible
-                  ? "Susun 4 pemain yang belum pernah main, urut kedatangan. Abaikan level."
-                  : "Butuh min. 4 pemain yang belum pernah main (0x)."}
+                  ? t("mode.firstMatchDescOk")
+                  : t("mode.firstMatchDescNo")}
               </span>
             </span>
           </button>
 
           {firstMatchAlert && !firstMatchEligible && (
             <div className="rounded-xl border border-amber-300 bg-amber-50 px-3 py-2.5 text-sm text-amber-900 dark:border-amber-900 dark:bg-amber-950/40 dark:text-amber-100">
-              ⚠️ Mode <b>Match Pertama</b> tidak bisa dipakai: pemain yang belum
-              pernah main (0x) kurang dari 4. Pilih mode lain di bawah.
+              {t("mode.firstMatchAlert")}
             </div>
           )}
 
@@ -817,13 +795,13 @@ function ModePickerSheet({
             >
               <span className="text-xl leading-none">{m.emoji}</span>
               <span className="flex min-w-0 flex-col gap-0.5">
-                <span className="font-semibold">{m.label}</span>
-                <span className="text-xs text-muted-foreground">{m.desc}</span>
+                <span className="font-semibold">{t(m.labelKey)}</span>
+                <span className="text-xs text-muted-foreground">{t(m.descKey)}</span>
               </span>
             </button>
           ))}
           <Button variant="outline" className="mt-1" onClick={onClose}>
-            Batal
+            {t("common.cancel")}
           </Button>
         </div>
       </SheetContent>
@@ -844,6 +822,7 @@ function DeleteCourtDialog({
   onConfirm: () => Promise<void>;
   onClose: () => void;
 }) {
+  const t = useT();
   const [deleting, setDeleting] = useState(false);
 
   const confirm = async () => {
@@ -860,23 +839,20 @@ function DeleteCourtDialog({
   return (
     <Sheet open onOpenChange={(o) => !o && !deleting && onClose()}>
       <SheetContent>
-        <SheetTitle className="text-lg font-bold">Hapus {label}?</SheetTitle>
+        <SheetTitle className="text-lg font-bold">
+          {t("deleteCourt.title", { label })}
+        </SheetTitle>
         {hasPlaying ? (
           <div className="mt-2 rounded-xl border border-destructive/50 bg-destructive/10 px-3 py-2.5 text-sm text-destructive">
-            ⚠️ Ada match yang <b>sedang berjalan</b> di lapangan ini. Menghapus
-            lapangan akan <b>membatalkan match tersebut</b> — skor yang belum
-            di-input hilang dan pemainnya dikembalikan ke status aktif. Tindakan
-            ini tidak bisa dibatalkan.
+            {t("deleteCourt.playing")}
           </div>
         ) : hasProposed ? (
           <p className="mt-2 text-sm text-muted-foreground">
-            Ada preview match berikutnya di lapangan ini. Menghapus lapangan akan
-            membatalkan preview tersebut. Tindakan ini tidak bisa dibatalkan.
+            {t("deleteCourt.proposed")}
           </p>
         ) : (
           <p className="mt-2 text-sm text-muted-foreground">
-            Lapangan ini akan dihapus dari sesi. Tindakan ini tidak bisa
-            dibatalkan.
+            {t("deleteCourt.plain")}
           </p>
         )}
         <div className="mt-4 flex gap-2">
@@ -886,7 +862,7 @@ function DeleteCourtDialog({
             onClick={onClose}
             disabled={deleting}
           >
-            Batal
+            {t("common.cancel")}
           </Button>
           <Button
             variant="destructive"
@@ -894,7 +870,7 @@ function DeleteCourtDialog({
             onClick={confirm}
             disabled={deleting}
           >
-            {deleting ? "Menghapus…" : "Hapus lapangan"}
+            {deleting ? t("deleteCourt.deleting") : t("deleteCourt.confirm")}
           </Button>
         </div>
       </SheetContent>
@@ -911,6 +887,7 @@ function RenameCourtDialog({
   onSave: (label: string) => Promise<void>;
   onClose: () => void;
 }) {
+  const t = useT();
   const [label, setLabel] = useState(initialLabel);
   const [saving, setSaving] = useState(false);
 
@@ -926,26 +903,26 @@ function RenameCourtDialog({
   return (
     <Sheet open onOpenChange={(o) => !o && onClose()}>
       <SheetContent>
-        <SheetTitle className="text-lg font-bold">Ubah Nama Lapangan</SheetTitle>
+        <SheetTitle className="text-lg font-bold">{t("courts.renameTitle")}</SheetTitle>
         <div className="mt-4 flex flex-col gap-4">
           <Input
             value={label}
             onChange={(e) => setLabel(e.target.value)}
-            placeholder="Nama lapangan (mis. Lapangan 14)"
+            placeholder={t("courts.renamePlaceholder")}
             data-vaul-no-drag
             onPointerDown={(e) => e.stopPropagation()}
             autoFocus
           />
           <div className="flex gap-2">
             <Button variant="outline" className="flex-1" onClick={onClose}>
-              Batal
+              {t("common.cancel")}
             </Button>
             <Button
               className="flex-1"
               onClick={save}
               disabled={!label.trim() || saving}
             >
-              {saving ? "Menyimpan…" : "Simpan"}
+              {saving ? t("courts.saving") : t("common.save")}
             </Button>
           </div>
         </div>

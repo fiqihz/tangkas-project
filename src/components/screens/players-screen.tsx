@@ -128,9 +128,7 @@ export function PlayersScreen() {
     <div className="flex flex-col gap-5">
       {players.length === 0 && (
         <div className="rounded-xl border border-dashed border-border p-6 text-center text-sm text-muted-foreground">
-          Belum ada pemain. Tap tombol{" "}
-          <span className="font-medium text-foreground">+ Pemain</span> untuk
-          menambah dari roster atau buat pemain baru.
+          {t("players.empty")}
         </div>
       )}
 
@@ -151,7 +149,7 @@ export function PlayersScreen() {
 
       {players.length > 0 && filtered.length === 0 && (
         <p className="py-6 text-center text-sm text-muted-foreground">
-          Tidak ada pemain cocok dengan &quot;{query}&quot;.
+          {t("players.noMatch")} &quot;{query}&quot;
         </p>
       )}
 
@@ -272,7 +270,7 @@ function PlayerRow({
           <div className="mt-3 flex flex-col gap-3 border-t border-border pt-3">
             <div>
               <div className="mb-1 text-xs text-muted-foreground">
-                Set level
+                {t("players.setLevel")}
               </div>
               <LevelSelect
                 value={player.level}
@@ -282,7 +280,8 @@ function PlayerRow({
             </div>
             <div>
               <div className="mb-1 text-xs text-muted-foreground">
-                Set gender {player.gender === null && "(belum di-set)"}
+                {t("players.setGender")}{" "}
+                {player.gender === null && t("players.notSet")}
               </div>
               <GenderSelect
                 value={player.gender}

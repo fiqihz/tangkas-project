@@ -7,6 +7,7 @@ import { Sheet, SheetContent, SheetTitle } from "@/components/ui/sheet";
 import { haptic } from "@/lib/haptics";
 import { isValidMatchup } from "@/lib/domain/rules";
 import { useSessionStore } from "@/lib/store/session-store";
+import { useT } from "@/lib/store/settings-store";
 import { cn } from "@/lib/utils";
 
 /**
@@ -21,6 +22,7 @@ export function ManualFillDialog({
   onClose: () => void;
 }) {
   const { players, setManualMatch, busyPlayerIds } = useSessionStore();
+  const t = useT();
   const [selected, setSelected] = useState<string[]>([]);
   const [submitting, setSubmitting] = useState(false);
 
@@ -74,15 +76,15 @@ export function ManualFillDialog({
   return (
     <Sheet open onOpenChange={(o) => !o && onClose()}>
       <SheetContent>
-        <SheetTitle className="text-lg font-bold">Isi Manual</SheetTitle>
+        <SheetTitle className="text-lg font-bold">{t("manual.title")}</SheetTitle>
         <p className="mt-1 text-sm text-muted-foreground">
-          Pilih 4 pemain (urutan: 2 pertama = Tim A, 2 berikutnya = Tim B).
+          {t("manual.subtitle")}
         </p>
 
         <div className="mt-3 flex flex-col gap-1.5">
           {candidates.length === 0 && (
             <p className="py-4 text-center text-sm text-muted-foreground">
-              Tidak ada pemain aktif yang menganggur.
+              {t("manual.noIdle")}
             </p>
           )}
           {candidates.map((p) => {
@@ -117,20 +119,20 @@ export function ManualFillDialog({
 
         {!ruleOk && (
           <p className="mt-2 text-sm text-destructive">
-            Melanggar aturan: Newbie tidak boleh setim dengan Newbie.
+            {t("manual.ruleViolation")}
           </p>
         )}
 
         <div className="mt-4 flex gap-2">
           <Button variant="outline" className="flex-1" onClick={onClose}>
-            Batal
+            {t("common.cancel")}
           </Button>
           <Button
             className="flex-1"
             onClick={submit}
             disabled={selected.length !== 4 || !ruleOk || submitting}
           >
-            {submitting ? "Menyimpan…" : `Mulai (${selected.length}/4)`}
+            {submitting ? t("manual.saving") : t("manual.start", { n: selected.length })}
           </Button>
         </div>
       </SheetContent>

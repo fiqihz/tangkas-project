@@ -3,10 +3,12 @@
 import { useMemo } from "react";
 import { buildLeaderboard } from "@/lib/domain/leaderboard";
 import { useSessionStore } from "@/lib/store/session-store";
+import { useT } from "@/lib/store/settings-store";
 import { cn } from "@/lib/utils";
 
 export function LeaderboardScreen() {
   const { players } = useSessionStore();
+  const t = useT();
 
   const rows = useMemo(
     () => buildLeaderboard(players.filter((p) => p.gamesPlayed > 0)),
@@ -16,16 +18,15 @@ export function LeaderboardScreen() {
   return (
     <div className="flex flex-col gap-3">
       <div>
-        <h2 className="text-lg font-bold">Livescore</h2>
+        <h2 className="text-lg font-bold">{t("leaderboard.title")}</h2>
         <p className="text-sm text-muted-foreground">
-          Update otomatis tiap match selesai. Urut: menang → selisih poin →
-          total poin. <b>+M</b> = bonus poin untuk jatah main yang tertinggal.
+          {t("leaderboard.subtitle")}
         </p>
       </div>
 
       {rows.length === 0 ? (
         <p className="py-8 text-center text-sm text-muted-foreground">
-          Belum ada hasil match.
+          {t("leaderboard.empty")}
         </p>
       ) : (
         <div className="overflow-hidden rounded-xl border border-border">
@@ -33,15 +34,15 @@ export function LeaderboardScreen() {
             <thead className="bg-secondary text-xs text-muted-foreground">
               <tr>
                 <th className="px-1.5 py-2 text-left">#</th>
-                <th className="px-1.5 py-2 text-left">Pemain</th>
+                <th className="px-1.5 py-2 text-left">{t("leaderboard.colPlayer")}</th>
                 <th className="px-1.5 py-2 text-center">M</th>
                 <th className="px-1.5 py-2 text-center">K</th>
-                <th className="px-1.5 py-2 text-center" title="Win rate">
+                <th className="px-1.5 py-2 text-center" title={t("leaderboard.winRate")}>
                   WR
                 </th>
                 <th
                   className="px-1.5 py-2 text-center"
-                  title="Bonus poin jatah main tertinggal"
+                  title={t("leaderboard.bonusTitle")}
                 >
                   +M
                 </th>

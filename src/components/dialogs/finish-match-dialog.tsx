@@ -7,6 +7,7 @@ import { Sheet, SheetContent, SheetTitle } from "@/components/ui/sheet";
 import { haptic } from "@/lib/haptics";
 import type { Match, SessionPlayer } from "@/lib/domain/types";
 import { useSessionStore } from "@/lib/store/session-store";
+import { useT } from "@/lib/store/settings-store";
 
 export function FinishMatchDialog({
   match,
@@ -18,6 +19,7 @@ export function FinishMatchDialog({
   onClose: () => void;
 }) {
   const { finishMatch } = useSessionStore();
+  const t = useT();
   const [scoreA, setScoreA] = useState("");
   const [scoreB, setScoreB] = useState("");
   const [submitting, setSubmitting] = useState(false);
@@ -44,10 +46,10 @@ export function FinishMatchDialog({
     <Sheet open onOpenChange={(o) => !o && onClose()}>
       <SheetContent>
         <SheetTitle className="text-lg font-bold">
-          Input Skor · Match ke-{match.round}
+          {t("finishMatch.title", { n: match.round })}
         </SheetTitle>
         <p className="mt-1 text-sm text-muted-foreground">
-          Setelah disimpan, lapangan bisa diisi pemain berikutnya.
+          {t("finishMatch.subtitle")}
         </p>
 
         <div className="mt-4 flex items-center gap-3">
@@ -79,25 +81,25 @@ export function FinishMatchDialog({
 
         {valid && a === b && (
           <p className="mt-2 text-xs text-amber-600">
-            Skor seri — akan dicatat sebagai draw.
+            {t("finishMatch.draw")}
           </p>
         )}
         {valid && a !== b && (
           <p className="mt-2 text-sm font-medium text-primary">
-            🏆 Pemenang: {a > b ? teamAName : teamBName}
+            {t("finishMatch.winner", { name: a > b ? teamAName : teamBName })}
           </p>
         )}
 
         <div className="mt-5 flex gap-2">
           <Button variant="outline" className="flex-1" onClick={onClose}>
-            Batal
+            {t("common.cancel")}
           </Button>
           <Button
             className="flex-1"
             onClick={submit}
             disabled={!valid || submitting}
           >
-            {submitting ? "Menyimpan…" : "Simpan"}
+            {submitting ? t("finishMatch.saving") : t("finishMatch.save")}
           </Button>
         </div>
       </SheetContent>

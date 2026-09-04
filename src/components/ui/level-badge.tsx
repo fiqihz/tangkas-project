@@ -1,4 +1,7 @@
+"use client";
+
 import { LEVEL_LABEL, type Level } from "@/lib/domain/types";
+import { useT } from "@/lib/store/settings-store";
 import { cn } from "@/lib/utils";
 
 const LEVEL_STYLE: Record<Level, string> = {
@@ -16,6 +19,7 @@ export function LevelBadge({
   level: Level | null;
   className?: string;
 }) {
+  const t = useT();
   if (!level) {
     return (
       <span
@@ -24,7 +28,7 @@ export function LevelBadge({
           className,
         )}
       >
-        belum di-set
+        {t("level.notSet")}
       </span>
     );
   }

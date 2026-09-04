@@ -9,6 +9,8 @@ import { Fab } from "@/components/ui/fab";
 import { Sheet, SheetContent, SheetTitle } from "@/components/ui/sheet";
 import { CardSkeletonList } from "@/components/ui/skeleton";
 import { useSessionStore } from "@/lib/store/session-store";
+import { useSettingsStore, useT } from "@/lib/store/settings-store";
+import type { DictKey } from "@/lib/i18n/dict";
 import { haptic } from "@/lib/haptics";
 import { cn } from "@/lib/utils";
 import type { DbSession, SessionStatus } from "@/lib/supabase/types";
@@ -17,11 +19,11 @@ import { RosterScreen } from "@/components/screens/roster-screen";
 
 const STATUS_META: Record<
   SessionStatus,
-  { label: string; dot: string; order: number }
+  { labelKey: DictKey; dot: string; order: number }
 > = {
-  ongoing: { label: "Sedang Berjalan", dot: "bg-primary", order: 0 },
-  scheduled: { label: "Dijadwalkan", dot: "bg-sky-500", order: 1 },
-  finished: { label: "Selesai", dot: "bg-muted-foreground", order: 2 },
+  ongoing: { labelKey: "sessions.status.ongoing", dot: "bg-primary", order: 0 },
+  scheduled: { labelKey: "sessions.status.scheduled", dot: "bg-sky-500", order: 1 },
+  finished: { labelKey: "sessions.status.finished", dot: "bg-muted-foreground", order: 2 },
 };
 
 export function SessionsListScreen() {
@@ -33,6 +35,7 @@ export function SessionsListScreen() {
     reactivateSession,
     deleteSession,
   } = useSessionStore();
+  const t = useT();
   const [creating, setCreating] = useState(false);
   const [msg, setMsg] = useState<string | null>(null);
   const [deleteTarget, setDeleteTarget] = useState<DbSession | null>(null);
@@ -59,7 +62,7 @@ export function SessionsListScreen() {
           <span className="text-xl">🏸</span>
           <div>
             <div className="font-bold leading-tight">TangkasBoard</div>
-            <div className="text-xs text-muted-foreground">Daftar Mabar</div>
+            <div className="text-xs text-muted-foreground">{t("sessions.subtitle")}</div>
           </div>
         </div>
         <button
@@ -69,7 +72,7 @@ export function SessionsListScreen() {
           }}
           className="flex items-center gap-1.5 rounded-lg border border-border px-3 py-2 text-sm font-medium active:scale-95 active:bg-secondary"
         >
-          <BarChart3 size={16} /> Roster
+          <BarChart3 size={16} /> {t("sessions.roster")}
         </button>
       </header>
 
@@ -78,9 +81,7 @@ export function SessionsListScreen() {
           <CardSkeletonList count={3} />
         ) : sessions.length === 0 ? (
           <div className="mt-10 rounded-xl border border-dashed border-border p-6 text-center text-sm text-muted-foreground">
-            Belum ada mabar. Tap tombol{" "}
-            <span className="font-medium text-foreground">+ Mabar</span> untuk
-            mulai atau menjadwalkan.
+            {t("sessions.empty")}
           </div>
         ) : (
           <div className="flex flex-col gap-5">
@@ -100,7 +101,7 @@ export function SessionsListScreen() {
                           STATUS_META[status].dot,
                         )}
                       />
-                      {STATUS_META[status].label} ({grouped[status].length})
+                      {t(STATUS_META[status].labelKey)} ({grouped[status].length})
                     </div>
                     <div className="flex flex-col gap-2">
                       {grouped[status].map((s, i) => (
@@ -112,7 +113,7 @@ export function SessionsListScreen() {
                           onStart={() => startSession(s.id)}
                           onReactivate={async () => {
                             const res = await reactivateSession(s.id);
-                            if (!res.ok) setMsg(res.reason ?? "Gagal.");
+                            if (!res.ok) setMsg(res.reason ?? t("sessions.failed"));
                           }}
                           onDelete={() => setDeleteTarget(s)}
                         />
@@ -128,7 +129,7 @@ export function SessionsListScreen() {
       <Fab
         onClick={() => setCreating(true)}
         icon={<Plus size={22} />}
-        label="Mabar"
+        label={t("sessions.fab")}
       />
 
       {creating && <CreateSessionDialog onClose={() => setCreating(false)} />}
@@ -138,11 +139,9 @@ export function SessionsListScreen() {
         onOpenChange={(o) => !o && setDeleteTarget(null)}
       >
         <SheetContent>
-          <SheetTitle className="text-lg font-bold">Hapus mabar?</SheetTitle>
+          <SheetTitle className="text-lg font-bold">{t("sessions.deleteTitle")}</SheetTitle>
           <p className="mt-1 text-sm text-muted-foreground">
-            Mabar <b>{deleteTarget?.name}</b> beserta semua match & skornya akan
-            dihapus permanen. Roster & level pemain tetap aman. Tindakan ini
-            tidak bisa dibatalkan.
+            {t("sessions.deleteBody", { name: deleteTarget?.name ?? "" })}
           </p>
           <div className="mt-5 flex gap-2">
             <Button
@@ -150,7 +149,7 @@ export function SessionsListScreen() {
               className="flex-1"
               onClick={() => setDeleteTarget(null)}
             >
-              Batal
+              {t("common.cancel")}
             </Button>
             <Button
               variant="destructive"
@@ -161,7 +160,7 @@ export function SessionsListScreen() {
                 setDeleteTarget(null);
               }}
             >
-              Ya, hapus
+              {t("sessions.deleteYes")}
             </Button>
           </div>
         </SheetContent>
@@ -185,12 +184,15 @@ function SessionCard({
   onReactivate: () => void;
   onDelete: () => void;
 }) {
+  const t = useT();
+  const lang = useSettingsStore((s) => s.lang);
+  const locale = lang === "en" ? "en-US" : "id-ID";
   const dateStr = session.scheduled_at
-    ? new Date(session.scheduled_at).toLocaleString("id-ID", {
+    ? new Date(session.scheduled_at).toLocaleString(locale, {
         dateStyle: "medium",
         timeStyle: "short",
       })
-    : new Date(session.created_at).toLocaleDateString("id-ID", {
+    : new Date(session.created_at).toLocaleDateString(locale, {
         dateStyle: "medium",
       });
 
@@ -206,7 +208,8 @@ function SessionCard({
             <div className="flex min-w-0 flex-1 flex-col items-start gap-0.5 py-1">
               <span className="truncate font-semibold">{session.name}</span>
               <span className="flex items-center gap-1 text-xs text-muted-foreground">
-                <CalendarClock size={12} /> {dateStr} · {session.courts} lapangan
+                <CalendarClock size={12} /> {dateStr} · {session.courts}{" "}
+                {t("sessions.courtsSuffix")}
               </span>
             </div>
             <button
@@ -215,7 +218,7 @@ function SessionCard({
                 onDelete();
               }}
               className="flex h-9 w-9 shrink-0 items-center justify-center rounded-lg text-muted-foreground active:scale-90 active:bg-secondary"
-              aria-label="Hapus mabar"
+              aria-label={t("sessions.deleteAria")}
             >
               <Trash2 size={16} />
             </button>
@@ -231,7 +234,7 @@ function SessionCard({
                   onOpen();
                 }}
               >
-                Buka
+                {t("sessions.open")}
               </Button>
             )}
             {session.status === "scheduled" && (
@@ -244,7 +247,7 @@ function SessionCard({
                   onStart();
                 }}
               >
-                <Play size={14} /> Mulai
+                <Play size={14} /> {t("sessions.start")}
               </Button>
             )}
             {session.status === "finished" && (
@@ -258,7 +261,7 @@ function SessionCard({
                     onOpen();
                   }}
                 >
-                  <Eye size={14} /> Lihat hasil
+                  <Eye size={14} /> {t("sessions.viewResult")}
                 </Button>
                 <Button
                   size="sm"
@@ -269,7 +272,7 @@ function SessionCard({
                     onReactivate();
                   }}
                 >
-                  <RotateCcw size={14} /> Aktifkan
+                  <RotateCcw size={14} /> {t("sessions.reactivate")}
                 </Button>
               </>
             )}

@@ -6,6 +6,7 @@ import { Input } from "@/components/ui/input";
 import { Sheet, SheetContent, SheetTitle } from "@/components/ui/sheet";
 import { haptic } from "@/lib/haptics";
 import { useSessionStore } from "@/lib/store/session-store";
+import { useSettingsStore, useT } from "@/lib/store/settings-store";
 
 /**
  * Sheet untuk membuat mabar baru.
@@ -15,8 +16,12 @@ import { useSessionStore } from "@/lib/store/session-store";
  */
 export function CreateSessionDialog({ onClose }: { onClose: () => void }) {
   const { createSession, error } = useSessionStore();
+  const t = useT();
+  const lang = useSettingsStore((s) => s.lang);
   const [name, setName] = useState(
-    "Mabar " + new Date().toLocaleDateString("id-ID"),
+    t("createSession.defaultName") +
+      " " +
+      new Date().toLocaleDateString(lang === "en" ? "en-US" : "id-ID"),
   );
   const [courts, setCourts] = useState(3);
   const [labels, setLabels] = useState<string[]>(["", "", ""]);
@@ -37,7 +42,7 @@ export function CreateSessionDialog({ onClose }: { onClose: () => void }) {
     haptic(15);
     setSubmitting(true);
     const res = await createSession({
-      name: name.trim() || "Mabar",
+      name: name.trim() || t("createSession.defaultName"),
       courts,
       status,
       scheduledAt:
@@ -54,17 +59,17 @@ export function CreateSessionDialog({ onClose }: { onClose: () => void }) {
   return (
     <Sheet open onOpenChange={(o) => !o && onClose()}>
       <SheetContent>
-        <SheetTitle className="text-lg font-bold">Mabar Baru</SheetTitle>
+        <SheetTitle className="text-lg font-bold">{t("createSession.title")}</SheetTitle>
 
         <div className="mt-4 flex flex-col gap-4">
           <div>
-            <label className="mb-1 block text-sm font-medium">Nama mabar</label>
+            <label className="mb-1 block text-sm font-medium">{t("createSession.name")}</label>
             <Input value={name} onChange={(e) => setName(e.target.value)} />
           </div>
 
           <div>
             <label className="mb-1 block text-sm font-medium">
-              Jadwal (opsional — isi jika ingin dijadwalkan)
+              {t("createSession.schedule")}
             </label>
             <Input
               type="datetime-local"
@@ -77,7 +82,7 @@ export function CreateSessionDialog({ onClose }: { onClose: () => void }) {
 
           <div>
             <label className="mb-1 block text-sm font-medium">
-              Jumlah lapangan
+              {t("createSession.courts")}
             </label>
             <div className="flex items-center gap-3">
               <Button
@@ -108,13 +113,13 @@ export function CreateSessionDialog({ onClose }: { onClose: () => void }) {
 
           <div>
             <div className="mb-1 text-sm font-medium">
-              Nama lapangan (opsional)
+              {t("createSession.courtNames")}
             </div>
             <div className="flex flex-col gap-2">
               {labels.map((lbl, i) => (
                 <Input
                   key={i}
-                  placeholder={`Lapangan ${i + 1}`}
+                  placeholder={t("createSession.courtPlaceholder", { n: i + 1 })}
                   value={lbl}
                   onChange={(e) =>
                     setLabels((prev) => {
@@ -136,7 +141,7 @@ export function CreateSessionDialog({ onClose }: { onClose: () => void }) {
               onClick={() => submit("ongoing")}
               disabled={submitting}
             >
-              {submitting ? "Membuat…" : "Mulai Sekarang 🏸"}
+              {submitting ? t("createSession.creating") : t("createSession.startNow")}
             </Button>
             <Button
               size="lg"
@@ -144,7 +149,7 @@ export function CreateSessionDialog({ onClose }: { onClose: () => void }) {
               onClick={() => submit("scheduled")}
               disabled={submitting}
             >
-              Simpan sebagai Jadwal
+              {t("createSession.scheduleBtn")}
             </Button>
           </div>
         </div>

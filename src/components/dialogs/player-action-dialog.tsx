@@ -12,6 +12,7 @@ import { Sheet, SheetContent, SheetTitle } from "@/components/ui/sheet";
 import { haptic } from "@/lib/haptics";
 import type { Match, PlayerStatus, SessionPlayer } from "@/lib/domain/types";
 import { useSessionStore } from "@/lib/store/session-store";
+import { useT } from "@/lib/store/settings-store";
 import { cn } from "@/lib/utils";
 
 // Niat penggantian: 'rest' -> pemain jadi resting; 'correct' -> tetap active
@@ -49,6 +50,7 @@ export function PlayerActionDialog({
     setPlayerLevel,
     setPlayerGender,
   } = useSessionStore();
+  const t = useT();
 
   const isPreview = match.state === "proposed";
 
@@ -127,7 +129,7 @@ export function PlayerActionDialog({
       ? await restProposedPlayer(match.id, player.id)
       : await substituteInProposed(match.id, player.id, "resting");
     setWorking(false);
-    if (!res.ok) return setMsg(res.reason ?? "Gagal.");
+    if (!res.ok) return setMsg(res.reason ?? t("playerAction.failed"));
     onClose();
   };
 
@@ -150,7 +152,7 @@ export function PlayerActionDialog({
           leavingStatus,
         );
     setWorking(false);
-    if (!res.ok) return setMsg(res.reason ?? "Gagal.");
+    if (!res.ok) return setMsg(res.reason ?? t("playerAction.failed"));
     onClose();
   };
 
@@ -162,7 +164,8 @@ export function PlayerActionDialog({
             {player.name} <LevelBadge level={player.level} />
           </span>
           <span className="text-xs font-medium text-muted-foreground">
-            {statLabel(player)} · {player.gamesPlayed}x main
+            {statLabel(player)} · {player.gamesPlayed}
+            {t("playerAction.gamesPlayed")}
           </span>
         </SheetTitle>
 
@@ -170,7 +173,8 @@ export function PlayerActionDialog({
           <>
             <div className="mt-3">
               <div className="mb-1 text-xs text-muted-foreground">
-                Set level {player.level === null && "(belum di-set)"}
+                {t("players.setLevel")}{" "}
+                {player.level === null && t("players.notSet")}
               </div>
               <LevelSelect
                 value={player.level}
@@ -184,7 +188,8 @@ export function PlayerActionDialog({
 
             <div className="mt-3">
               <div className="mb-1 text-xs text-muted-foreground">
-                Set gender {player.gender === null && "(belum di-set)"}
+                {t("players.setGender")}{" "}
+                {player.gender === null && t("players.notSet")}
               </div>
               <GenderSelect
                 value={player.gender}
@@ -207,14 +212,14 @@ export function PlayerActionDialog({
                   height={18}
                   className="opacity-90"
                 />
-                Istirahatkan (pengganti otomatis)
+                {t("playerAction.restAuto")}
               </Button>
               <Button
                 size="lg"
                 variant="outline"
                 onClick={() => openPick("rest")}
               >
-                <UserCog size={18} /> Istirahatkan — pilih pengganti
+                <UserCog size={18} /> {t("playerAction.restPick")}
               </Button>
 
               <Button
@@ -222,11 +227,11 @@ export function PlayerActionDialog({
                 variant="outline"
                 onClick={() => openPick("correct")}
               >
-                <ArrowLeftRight size={18} /> Ganti / tukar pemain
+                <ArrowLeftRight size={18} /> {t("playerAction.swap")}
               </Button>
 
               <Button size="lg" variant="ghost" onClick={onClose}>
-                <X size={18} /> Batal
+                <X size={18} /> {t("common.cancel")}
               </Button>
             </div>
           </>
@@ -236,8 +241,8 @@ export function PlayerActionDialog({
           <>
             <p className="mt-1 text-sm text-muted-foreground">
               {intent === "rest"
-                ? `Pilih pengganti — ${player.name} akan istirahat.`
-                : `Pilih pengganti untuk ${player.name}.`}
+                ? t("playerAction.pickRest", { name: player.name })
+                : t("playerAction.pickFor", { name: player.name })}
             </p>
             {msg && <p className="mt-2 text-sm text-destructive">{msg}</p>}
 
@@ -247,7 +252,7 @@ export function PlayerActionDialog({
                 className="absolute left-3 top-1/2 -translate-y-1/2 text-muted-foreground"
               />
               <Input
-                placeholder="Cari nama…"
+                placeholder={t("playerAction.searchName")}
                 value={query}
                 onChange={(e) => setQuery(e.target.value)}
                 className="pl-9"
@@ -257,7 +262,7 @@ export function PlayerActionDialog({
             <div className="flex max-h-[50vh] flex-col gap-3 overflow-y-auto">
               {isPreview ? (
                 <>
-                  <Section title="Menunggu">
+                  <Section title={t("playerAction.waiting")}>
                     {applyQuery(previewCandidates.waiting).map((c) => (
                       <CandidateRow
                         key={c.id}
@@ -267,44 +272,44 @@ export function PlayerActionDialog({
                       />
                     ))}
                     {applyQuery(previewCandidates.waiting).length === 0 && (
-                      <EmptyRow />
+                      <EmptyRow t={t} />
                     )}
                   </Section>
                   {applyQuery(previewCandidates.playing).length > 0 && (
-                    <Section title="Sedang bermain (di-booking untuk match ini)">
+                    <Section title={t("playerAction.playingSection")}>
                       {applyQuery(previewCandidates.playing).map((c) => (
                         <CandidateRow
                           key={c.id}
                           player={c}
                           onPick={() => doPick(c.id)}
                           disabled={working}
-                          tag="sedang bermain"
+                          tag={t("playerAction.playingTag")}
                         />
                       ))}
                     </Section>
                   )}
                   {previewCandidates.samePreview.length > 0 && (
-                    <Section title="Tukar posisi di preview ini">
+                    <Section title={t("playerAction.swapSamePreview")}>
                       {previewCandidates.samePreview.map((c) => (
                         <CandidateRow
                           key={c.id}
                           player={c}
                           onPick={() => doPick(c.id)}
                           disabled={working}
-                          tag="preview ini"
+                          tag={t("playerAction.previewThis")}
                         />
                       ))}
                     </Section>
                   )}
                   {applyQuery(previewCandidates.otherPreview).length > 0 && (
-                    <Section title="Tukar dengan preview lapangan lain">
+                    <Section title={t("playerAction.swapOtherPreview")}>
                       {applyQuery(previewCandidates.otherPreview).map((c) => (
                         <CandidateRow
                           key={c.id}
                           player={c}
                           onPick={() => doPick(c.id)}
                           disabled={working}
-                          tag="preview lain"
+                          tag={t("playerAction.previewOther")}
                         />
                       ))}
                     </Section>
@@ -313,7 +318,7 @@ export function PlayerActionDialog({
               ) : (
                 <>
                   {preferred.length > 0 && (
-                    <Section title="⭐ Disarankan">
+                    <Section title={t("playerAction.suggested")}>
                       {preferred.map((c) => (
                         <CandidateRow
                           key={c.id}
@@ -325,7 +330,7 @@ export function PlayerActionDialog({
                       ))}
                     </Section>
                   )}
-                  <Section title="Semua pemain tersedia">
+                  <Section title={t("playerAction.allAvailable")}>
                     {applyQuery(others).map((c) => (
                       <CandidateRow
                         key={c.id}
@@ -334,30 +339,30 @@ export function PlayerActionDialog({
                         disabled={working}
                       />
                     ))}
-                    {applyQuery(others).length === 0 && <EmptyRow />}
+                    {applyQuery(others).length === 0 && <EmptyRow t={t} />}
                   </Section>
                   {intent === "correct" && sameMatch.length > 0 && (
-                    <Section title="Tukar posisi di lapangan ini">
+                    <Section title={t("playerAction.swapThisCourt")}>
                       {sameMatch.map((c) => (
                         <CandidateRow
                           key={c.id}
                           player={c}
                           onPick={() => doPick(c.id)}
                           disabled={working}
-                          tag="lapangan ini"
+                          tag={t("playerAction.thisCourt")}
                         />
                       ))}
                     </Section>
                   )}
                   {intent === "correct" && applyQuery(playing).length > 0 && (
-                    <Section title="Tukar dengan yang sedang main (lapangan lain)">
+                    <Section title={t("playerAction.swapPlaying")}>
                       {applyQuery(playing).map((c) => (
                         <CandidateRow
                           key={c.id}
                           player={c}
                           onPick={() => doPick(c.id)}
                           disabled={working}
-                          tag="main"
+                          tag={t("playerAction.playingShort")}
                         />
                       ))}
                     </Section>
@@ -375,7 +380,7 @@ export function PlayerActionDialog({
                 setMsg(null);
               }}
             >
-              Kembali
+              {t("common.back")}
             </Button>
           </>
         )}
@@ -401,10 +406,10 @@ function Section({
   );
 }
 
-function EmptyRow() {
+function EmptyRow({ t }: { t: ReturnType<typeof useT> }) {
   return (
     <p className="py-2 text-center text-xs text-muted-foreground">
-      Tidak ada pemain.
+      {t("common.noPlayers")}
     </p>
   );
 }

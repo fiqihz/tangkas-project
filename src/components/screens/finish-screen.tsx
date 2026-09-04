@@ -7,10 +7,12 @@ import { Card, CardContent } from "@/components/ui/card";
 import { Sheet, SheetContent, SheetTitle } from "@/components/ui/sheet";
 import { buildLeaderboard } from "@/lib/domain/leaderboard";
 import { useSessionStore } from "@/lib/store/session-store";
+import { useT } from "@/lib/store/settings-store";
 import { haptic } from "@/lib/haptics";
 
 export function FinishScreen() {
   const { players, finishSession } = useSessionStore();
+  const t = useT();
   const [confirming, setConfirming] = useState(false);
   const [finishing, setFinishing] = useState(false);
 
@@ -31,9 +33,9 @@ export function FinishScreen() {
   return (
     <div className="flex flex-col gap-4">
       <div>
-        <h2 className="text-lg font-bold">Selesai Mabar</h2>
+        <h2 className="text-lg font-bold">{t("finish.title")}</h2>
         <p className="text-sm text-muted-foreground">
-          Tekan tombol di bawah untuk mengunci hasil akhir & menampilkan juara.
+          {t("finish.subtitle")}
         </p>
       </div>
 
@@ -47,20 +49,22 @@ export function FinishScreen() {
             <CardContent className="pt-4 text-center">
               <div className="text-5xl">🏆</div>
               <div className="mt-1 text-sm text-muted-foreground">
-                Pemuncak sementara
+                {t("finish.leader")}
               </div>
               <div className="text-2xl font-bold">{champion.name}</div>
               <div className="text-sm text-muted-foreground">
-                {champion.wins} menang · diff{" "}
-                {champion.pointDiff >= 0 ? "+" : ""}
-                {champion.pointDiff} · {champion.pointsScored} poin
+                {t("finish.winsPoints", {
+                  wins: champion.wins,
+                  diff: `${champion.pointDiff >= 0 ? "+" : ""}${champion.pointDiff}`,
+                  points: champion.pointsScored,
+                })}
               </div>
             </CardContent>
           </Card>
         </motion.div>
       ) : (
         <p className="text-sm text-muted-foreground">
-          Belum ada hasil match. Selesaikan minimal satu match dulu.
+          {t("finish.noResult")}
         </p>
       )}
 
@@ -72,18 +76,16 @@ export function FinishScreen() {
           setConfirming(true);
         }}
       >
-        SELESAI MABAR
+        {t("finish.finishButton")}
       </Button>
 
       <Sheet open={confirming} onOpenChange={setConfirming}>
         <SheetContent>
           <SheetTitle className="text-lg font-bold">
-            Selesaikan mabar?
+            {t("finish.confirmTitle")}
           </SheetTitle>
           <p className="mt-1 text-sm text-muted-foreground">
-            Hasil akhir akan ditampilkan & sesi diarsipkan. Roster, level, dan
-            hitungan &quot;ikut mabar&quot; pemain tetap tersimpan untuk mabar
-            berikutnya.
+            {t("finish.confirmBody")}
           </p>
           <div className="mt-5 flex gap-2">
             <Button
@@ -91,7 +93,7 @@ export function FinishScreen() {
               className="flex-1"
               onClick={() => setConfirming(false)}
             >
-              Batal
+              {t("common.cancel")}
             </Button>
             <Button
               variant="destructive"
@@ -99,7 +101,7 @@ export function FinishScreen() {
               onClick={doFinish}
               disabled={finishing}
             >
-              {finishing ? "Menyelesaikan…" : "Ya, selesai"}
+              {finishing ? t("finish.finishing") : t("finish.confirmYes")}
             </Button>
           </div>
         </SheetContent>

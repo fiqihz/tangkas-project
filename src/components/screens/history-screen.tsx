@@ -5,12 +5,14 @@ import { Clock, Pencil } from "lucide-react";
 import { LevelBadge } from "@/components/ui/level-badge";
 import type { Match, SessionPlayer } from "@/lib/domain/types";
 import { useSessionStore } from "@/lib/store/session-store";
+import { useT } from "@/lib/store/settings-store";
 import { haptic } from "@/lib/haptics";
 import { cn } from "@/lib/utils";
 import { EditScoreDialog } from "@/components/dialogs/edit-score-dialog";
 
 export function HistoryScreen() {
   const { matches, players } = useSessionStore();
+  const t = useT();
   const [editFor, setEditFor] = useState<Match | null>(null);
 
   const byId = useMemo(() => new Map(players.map((p) => [p.id, p])), [players]);
@@ -26,7 +28,7 @@ export function HistoryScreen() {
   const groups = useMemo(() => {
     const map = new Map<string, Match[]>();
     for (const m of past) {
-      const key = m.courtLabel ?? "Lapangan (dihapus)";
+      const key = m.courtLabel ?? "\u0000deleted"; // sentinel; diterjemahkan saat render
       const arr = map.get(key) ?? [];
       arr.push(m);
       map.set(key, arr);
@@ -41,21 +43,22 @@ export function HistoryScreen() {
   return (
     <div className="flex flex-col gap-5">
       <div>
-        <h2 className="text-lg font-bold">History Match</h2>
+        <h2 className="text-lg font-bold">{t("history.title")}</h2>
         <p className="text-sm text-muted-foreground">
-          Semua match yang sudah berlalu per lapangan. Tap ikon pensil untuk
-          edit skor.
+          {t("history.subtitle")}
         </p>
       </div>
 
       {groups.length === 0 ? (
         <p className="py-8 text-center text-sm text-muted-foreground">
-          Belum ada match yang selesai.
+          {t("history.empty")}
         </p>
       ) : (
         groups.map(([label, list]) => (
           <div key={label}>
-            <div className="mb-2 text-sm font-medium">{label}</div>
+            <div className="mb-2 text-sm font-medium">
+              {label === "\u0000deleted" ? t("courts.deletedCourt") : label}
+            </div>
             <div className="flex flex-col gap-2">
               {list.map((m, idx) => (
                 <MatchHistoryRow
@@ -63,6 +66,7 @@ export function HistoryScreen() {
                   match={m}
                   matchNumber={idx + 1}
                   byId={byId}
+                  t={t}
                   onEdit={() => {
                     haptic(10);
                     setEditFor(m);
@@ -89,11 +93,13 @@ function MatchHistoryRow({
   match,
   matchNumber,
   byId,
+  t,
   onEdit,
 }: {
   match: Match;
   matchNumber: number;
   byId: Map<string, SessionPlayer>;
+  t: ReturnType<typeof useT>;
   onEdit: () => void;
 }) {
   const name = (id: string) => byId.get(id)?.name ?? "?";
@@ -108,7 +114,7 @@ function MatchHistoryRow({
       <div className="mb-2 flex items-center justify-between">
         <span className="flex items-center gap-1.5 text-xs font-medium">
           <span className="rounded-md bg-primary/10 px-2 py-0.5 text-primary">
-            Match ke-{matchNumber}
+            {t("courts.matchNo", { n: matchNumber })}
           </span>
           {duration && (
             <span className="flex items-center gap-1 rounded-md bg-secondary px-2 py-0.5 text-muted-foreground">
@@ -117,7 +123,7 @@ function MatchHistoryRow({
           )}
           {unfinished && (
             <span className="rounded-md bg-destructive/10 px-2 py-0.5 text-destructive">
-              tidak selesai
+              {t("history.unfinished")}
             </span>
           )}
         </span>
@@ -125,7 +131,7 @@ function MatchHistoryRow({
           <button
             onClick={onEdit}
             className="flex h-8 w-8 items-center justify-center rounded-lg text-muted-foreground active:scale-90 active:bg-secondary"
-            aria-label="Edit skor"
+            aria-label={t("history.editScore")}
           >
             <Pencil size={15} />
           </button>

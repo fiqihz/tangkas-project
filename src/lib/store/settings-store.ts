@@ -5,6 +5,25 @@ import { DICT, type DictKey, type Lang } from "@/lib/i18n/dict";
 
 export type Theme = "light" | "dark";
 
+/** Nilai untuk interpolasi placeholder {name} di string terjemahan. */
+export type TVars = Record<string, string | number>;
+
+/** Ganti placeholder {key} dengan nilai dari vars. Aman bila vars kosong. */
+function interpolate(template: string, vars?: TVars): string {
+  if (!vars) return template;
+  return template.replace(/\{(\w+)\}/g, (m, k) =>
+    k in vars ? String(vars[k]) : m,
+  );
+}
+
+/** Resolusi kunci terjemahan sesuai bahasa + interpolasi. */
+function translate(key: DictKey, lang: Lang, vars?: TVars): string {
+  const entry = DICT[key];
+  if (!entry) return key;
+  const raw = entry[lang] ?? entry.id ?? key;
+  return interpolate(raw, vars);
+}
+
 const THEME_KEY = "tb.theme";
 const LANG_KEY = "tb.lang";
 
@@ -44,8 +63,8 @@ interface SettingsState {
   setLang: (lang: Lang) => void;
   /** Sinkronkan state dari localStorage + terapkan class tema. */
   hydrate: () => void;
-  /** Terjemahkan sebuah kunci sesuai bahasa aktif. */
-  t: (key: DictKey) => string;
+  /** Terjemahkan sebuah kunci sesuai bahasa aktif (opsional interpolasi). */
+  t: (key: DictKey, vars?: TVars) => string;
 }
 
 export const useSettingsStore = create<SettingsState>((set, get) => ({
@@ -79,10 +98,8 @@ export const useSettingsStore = create<SettingsState>((set, get) => ({
     set({ lang });
   },
 
-  t(key) {
-    const entry = DICT[key];
-    if (!entry) return key;
-    return entry[get().lang] ?? entry.id ?? key;
+  t(key, vars) {
+    return translate(key, get().lang, vars);
   },
 }));
 
@@ -93,9 +110,5 @@ export const useSettingsStore = create<SettingsState>((set, get) => ({
  */
 export function useT() {
   const lang = useSettingsStore((s) => s.lang);
-  return (key: DictKey) => {
-    const entry = DICT[key];
-    if (!entry) return key;
-    return entry[lang] ?? entry.id ?? key;
-  };
+  return (key: DictKey, vars?: TVars) => translate(key, lang, vars);
 }

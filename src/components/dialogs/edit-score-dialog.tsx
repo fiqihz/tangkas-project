@@ -7,6 +7,7 @@ import { Sheet, SheetContent, SheetTitle } from "@/components/ui/sheet";
 import { haptic } from "@/lib/haptics";
 import type { Match, SessionPlayer } from "@/lib/domain/types";
 import { useSessionStore } from "@/lib/store/session-store";
+import { useT } from "@/lib/store/settings-store";
 
 /**
  * Edit skor match yang sudah selesai. Statistik pemain di-recalculate
@@ -22,6 +23,7 @@ export function EditScoreDialog({
   onClose: () => void;
 }) {
   const { editMatchScore } = useSessionStore();
+  const t = useT();
   const [scoreA, setScoreA] = useState(String(match.score?.a ?? ""));
   const [scoreB, setScoreB] = useState(String(match.score?.b ?? ""));
   const [submitting, setSubmitting] = useState(false);
@@ -43,7 +45,7 @@ export function EditScoreDialog({
     const res = await editMatchScore(match.id, a, b, winner);
     setSubmitting(false);
     if (!res.ok) {
-      setMsg(res.reason ?? "Gagal menyimpan.");
+      setMsg(res.reason ?? t("editScore.failed"));
       return;
     }
     onClose();
@@ -52,9 +54,9 @@ export function EditScoreDialog({
   return (
     <Sheet open onOpenChange={(o) => !o && onClose()}>
       <SheetContent>
-        <SheetTitle className="text-lg font-bold">Edit Skor</SheetTitle>
+        <SheetTitle className="text-lg font-bold">{t("editScore.title")}</SheetTitle>
         <p className="mt-1 text-sm text-muted-foreground">
-          Statistik & leaderboard otomatis dihitung ulang.
+          {t("editScore.subtitle")}
         </p>
 
         <div className="mt-4 flex items-center gap-3">
@@ -87,21 +89,21 @@ export function EditScoreDialog({
 
         {valid && a !== b && (
           <p className="mt-2 text-sm font-medium text-primary">
-            🏆 Pemenang: {a > b ? teamAName : teamBName}
+            {t("finishMatch.winner", { name: a > b ? teamAName : teamBName })}
           </p>
         )}
         {msg && <p className="mt-2 text-sm text-destructive">{msg}</p>}
 
         <div className="mt-5 flex gap-2">
           <Button variant="outline" className="flex-1" onClick={onClose}>
-            Batal
+            {t("common.cancel")}
           </Button>
           <Button
             className="flex-1"
             onClick={submit}
             disabled={!valid || submitting}
           >
-            {submitting ? "Menyimpan…" : "Simpan"}
+            {submitting ? t("finishMatch.saving") : t("finishMatch.save")}
           </Button>
         </div>
       </SheetContent>
