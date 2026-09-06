@@ -1,6 +1,21 @@
 import type { Metadata, Viewport } from "next";
+import { Inter, Space_Grotesk } from "next/font/google";
 import "./globals.css";
 import { PwaRegister } from "@/components/pwa-register";
+
+// Inter = body/UI (kebacaan tinggi). Space Grotesk = display/headline (sporty
+// tapi clean). Di-expose sebagai CSS var agar dipakai lewat Tailwind fontFamily.
+const inter = Inter({
+  subsets: ["latin"],
+  variable: "--font-sans",
+  display: "swap",
+});
+const spaceGrotesk = Space_Grotesk({
+  subsets: ["latin"],
+  weight: ["500", "600", "700"],
+  variable: "--font-display",
+  display: "swap",
+});
 
 export const metadata: Metadata = {
   title: "TangkasBoard",
@@ -44,7 +59,9 @@ export default function RootLayout({
           }}
         />
       </head>
-      <body className="min-h-screen antialiased">
+      <body
+        className={`${inter.variable} ${spaceGrotesk.variable} min-h-screen font-sans antialiased`}
+      >
         <PwaRegister />
         {children}
       </body>

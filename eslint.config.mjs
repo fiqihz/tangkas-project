@@ -7,6 +7,7 @@ const eslintConfig = [
       ".next/**",
       "node_modules/**",
       "src/lib/domain/simulate*.ts",
+      "supabase/functions/**",
     ],
   },
 ];

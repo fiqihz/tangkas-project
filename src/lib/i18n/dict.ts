@@ -428,6 +428,185 @@ export const DICT = {
   },
   "result.tabResult": { id: "Hasil", en: "Result" },
   "result.tabHistory": { id: "History", en: "History" },
+
+  // ==========================================================================
+  // LANDING PAGE
+  // ==========================================================================
+  // Navbar
+  "landing.nav.how": { id: "Cara Kerja", en: "How It Works" },
+  "landing.nav.features": { id: "Fitur", en: "Features" },
+  "landing.nav.feedback": { id: "Masukan", en: "Feedback" },
+  "landing.nav.openApp": { id: "Buka Aplikasi", en: "Open App" },
+  "landing.langToggle": { id: "EN", en: "ID" },
+
+  // Hero
+  "landing.hero.badge": { id: "Gratis untuk komunitas badminton", en: "Free for badminton communities" },
+  "landing.hero.title": {
+    id: "Atur mabar. Bagi lapangan. Adil.",
+    en: "Run sessions. Split courts. Fairly.",
+  },
+  "landing.hero.subtitle": {
+    id: "TangkasBoard menyusun tim, mencatat skor, dan menentukan juara secara otomatis — biar kamu tinggal main.",
+    en: "TangkasBoard builds teams, records scores, and crowns the champion automatically — so you can just play.",
+  },
+  "landing.hero.ctaPrimary": { id: "Mulai gratis", en: "Start free" },
+  "landing.hero.ctaSecondary": { id: "Lihat cara kerja", en: "See how it works" },
+  "landing.hero.note": { id: "Bisa dipasang di HP · Dipakai langsung di GOR", en: "Installs on your phone · Built for the court" },
+
+  // What is it
+  "landing.what.title": { id: "Apa itu TangkasBoard?", en: "What is TangkasBoard?" },
+  "landing.what.body": {
+    id: "Aplikasi manajemen sesi main bareng (mabar) badminton ganda untuk host komunitas. Bagi pemain ke lapangan dengan adil berdasarkan level & jatah main, catat skor tiap match, dan lihat leaderboard langsung sampai penentuan juara.",
+    en: "A session manager for community badminton doubles hosts. Split players onto courts fairly based on level & play turns, record each match's score, and watch a live leaderboard through to the champion.",
+  },
+
+  // How it works
+  "landing.how.title": { id: "Cara Kerjanya", en: "How It Works" },
+  "landing.how.subtitle": {
+    id: "Empat langkah sederhana dari daftar pemain sampai juara.",
+    en: "Four simple steps from player list to champion.",
+  },
+  "landing.how.step1.title": { id: "Buat mabar & daftar pemain", en: "Create a session & add players" },
+  "landing.how.step1.body": {
+    id: "Bikin sesi mabar, tentukan jumlah lapangan, lalu daftarkan pemain dari roster atau tambah pemain baru.",
+    en: "Create a session, set the number of courts, then add players from your roster or create new ones.",
+  },
+  "landing.how.step2.title": { id: "Smart Matchmaking", en: "Smart Matchmaking" },
+  "landing.how.step2.body": {
+    id: "Satu tap menyusun tim seimbang: mempertimbangkan level, jatah main, waktu tunggu, dan menghindari lawan yang itu-itu terus.",
+    en: "One tap builds balanced teams: considering level, play turns, waiting time, and avoiding repeat opponents.",
+  },
+  "landing.how.step3.title": { id: "Catat skor tiap match", en: "Record each match score" },
+  "landing.how.step3.body": {
+    id: "Selesai main, input skor. Leaderboard langsung update otomatis di semua perangkat.",
+    en: "After a match, enter the score. The leaderboard updates instantly across all devices.",
+  },
+  "landing.how.step4.title": { id: "Tentukan juara", en: "Crown the champion" },
+  "landing.how.step4.body": {
+    id: "Akhiri mabar untuk melihat podium juara & ranking lengkap, lalu bagikan hasilnya ke grup.",
+    en: "End the session to see the champion podium & full ranking, then share the result to your group.",
+  },
+
+  // Features
+  "landing.features.title": { id: "Fitur Unggulan", en: "Key Features" },
+  "landing.features.matchmaking.title": { id: "Matchmaking Adil", en: "Fair Matchmaking" },
+  "landing.features.matchmaking.body": {
+    id: "Algoritma menyeimbangkan level tim & meratakan jatah main tanpa melanggar aturan pasangan.",
+    en: "The algorithm balances team levels & evens out play turns without breaking pairing rules.",
+  },
+  "landing.features.level.title": { id: "Level Dinamis", en: "Dynamic Levels" },
+  "landing.features.level.body": {
+    id: "Atur level pemain lewat observasi. Level tersimpan permanen untuk mabar berikutnya.",
+    en: "Set player levels by observation. Levels are saved permanently for future sessions.",
+  },
+  "landing.features.multicourt.title": { id: "Multi-Lapangan", en: "Multi-Court" },
+  "landing.features.multicourt.body": {
+    id: "Kelola banyak lapangan sekaligus, tiap lapangan berjalan independen dengan rotasi lintas lapangan.",
+    en: "Manage many courts at once, each running independently with cross-court rotation.",
+  },
+  "landing.features.livescore.title": { id: "Livescore Realtime", en: "Realtime Livescore" },
+  "landing.features.livescore.body": {
+    id: "Leaderboard update otomatis di semua perangkat yang membuka sesi yang sama.",
+    en: "The leaderboard updates automatically on every device viewing the same session.",
+  },
+  "landing.features.modes.title": { id: "Mode Match Beragam", en: "Varied Match Modes" },
+  "landing.features.modes.body": {
+    id: "Seimbang, Campuran, Ganda Putri, Gendongan, atau Sesuai Kelas — pilih sesuai suasana.",
+    en: "Balanced, Mixed, Ladies, Carry, or By Class — pick to suit the vibe.",
+  },
+  "landing.features.pwa.title": { id: "PWA Mobile-First", en: "Mobile-First PWA" },
+  "landing.features.pwa.body": {
+    id: "Pasang di layar utama HP seperti aplikasi biasa. Ringan & cepat.",
+    en: "Install it to your phone's home screen like a native app. Light & fast.",
+  },
+
+  // Feedback section
+  "landing.feedback.title": { id: "Masukan & Temuan", en: "Feedback & Findings" },
+  "landing.feedback.subtitle": {
+    id: "Punya ide, kritik, atau nemu bug? Kabari kami — masukan kamu bantu TangkasBoard makin baik.",
+    en: "Got an idea, critique, or found a bug? Let us know — your feedback helps TangkasBoard improve.",
+  },
+  "landing.feedback.messageLabel": { id: "Pesan", en: "Message" },
+  "landing.feedback.messagePlaceholder": {
+    id: "Tulis masukan, ide, atau temuan kamu di sini…",
+    en: "Write your feedback, idea, or finding here…",
+  },
+  "landing.feedback.contactLabel": { id: "Kontak (opsional)", en: "Contact (optional)" },
+  "landing.feedback.contactPlaceholder": {
+    id: "Email / WhatsApp — jika ingin kami balas",
+    en: "Email / WhatsApp — if you'd like a reply",
+  },
+  "landing.feedback.submit": { id: "Kirim Masukan", en: "Send Feedback" },
+  "landing.feedback.sending": { id: "Mengirim…", en: "Sending…" },
+  "landing.feedback.success": {
+    id: "Terima kasih! Masukan kamu sudah terkirim. 🙏",
+    en: "Thank you! Your feedback has been sent. 🙏",
+  },
+  "landing.feedback.error": {
+    id: "Gagal mengirim. Coba lagi sebentar lagi.",
+    en: "Failed to send. Please try again shortly.",
+  },
+  "landing.feedback.emptyError": { id: "Pesan tidak boleh kosong.", en: "Message can't be empty." },
+
+  // Footer
+  "landing.footer.tagline": {
+    id: "Manajemen mabar badminton yang adil & menyenangkan.",
+    en: "Fair & fun badminton session management.",
+  },
+  "landing.footer.openApp": { id: "Buka Aplikasi", en: "Open App" },
+  "landing.footer.rights": { id: "Dibuat untuk komunitas badminton.", en: "Made for badminton communities." },
+
+  // Langkah baru #1: daftar akun & buat komunitas (register + create community)
+  "landing.how.step0.title": { id: "Daftar & buat komunitas", en: "Sign up & create a community" },
+  "landing.how.step0.body": {
+    id: "Bikin akun host, lalu buat komunitas badminton kamu. Semua mabar & pemain bernaung di sana.",
+    en: "Create a host account, then set up your badminton community. All sessions & players live under it.",
+  },
+
+  // Fitur PWA di-reframe dari sudut pandang user (bukan jargon "PWA")
+  "landing.features.install.title": { id: "Pasang di HP, siap di lapangan", en: "Install on your phone, ready on-court" },
+  "landing.features.install.body": {
+    id: "Tambahkan ke layar utama seperti aplikasi biasa. Ringan, cepat, dan tetap responsif saat sinyal GOR pas-pasan.",
+    en: "Add it to your home screen like a native app. Light, fast, and responsive even on shaky venue signal.",
+  },
+
+  // Chip stat pada kartu featured matchmaking
+  "landing.features.chipLevel": { id: "Seimbang per level", en: "Balanced by level" },
+  "landing.features.chipTurns": { id: "Jatah main merata", en: "Even play turns" },
+  "landing.features.chipRepeat": { id: "Anti lawan berulang", en: "No repeat opponents" },
+
+  // ── FAQ ──
+  "landing.nav.faq": { id: "FAQ", en: "FAQ" },
+  "landing.faq.title": { id: "Pertanyaan yang sering muncul", en: "Frequently asked questions" },
+  "landing.faq.subtitle": {
+    id: "Hal-hal yang biasa ditanyakan host sebelum mulai.",
+    en: "What hosts usually ask before getting started.",
+  },
+  "landing.faq.q1": { id: "Apakah TangkasBoard gratis?", en: "Is TangkasBoard free?" },
+  "landing.faq.a1": {
+    id: "Ya. Kamu bisa membuat komunitas, mendaftarkan pemain, dan mengelola mabar tanpa biaya.",
+    en: "Yes. You can create a community, register players, and run sessions at no cost.",
+  },
+  "landing.faq.q2": { id: "Apakah mendukung tunggal (single)?", en: "Does it support singles?" },
+  "landing.faq.a2": {
+    id: "Belum. Untuk saat ini TangkasBoard fokus pada ganda (2 lawan 2), format paling umum di mabar komunitas. Dukungan tunggal sedang kami pertimbangkan.",
+    en: "Not yet. For now TangkasBoard focuses on doubles (2v2), the most common format in community sessions. Singles support is on our radar.",
+  },
+  "landing.faq.q3": { id: "Berapa set per match yang dicatat?", en: "How many sets per match are recorded?" },
+  "landing.faq.a3": {
+    id: "Saat ini skor dicatat per 1 set (mis. 30 poin). Format 2–3 set (best of three) sedang dalam rencana pengembangan.",
+    en: "Right now scores are recorded as a single set (e.g. 30 points). A 2–3 set format (best of three) is on the roadmap.",
+  },
+  "landing.faq.q4": { id: "Bagaimana matchmaking menjaga keadilan?", en: "How does matchmaking stay fair?" },
+  "landing.faq.a4": {
+    id: "Sistem menyeimbangkan level tim, mendahulukan pemain dengan jatah main paling sedikit, mempertimbangkan waktu tunggu, dan menghindari pasangan/lawan yang berulang.",
+    en: "The system balances team levels, prioritizes players with the fewest games, weighs waiting time, and avoids repeat partners and opponents.",
+  },
+  "landing.faq.q5": { id: "Bisakah beberapa host mengelola satu komunitas?", en: "Can several hosts manage one community?" },
+  "landing.faq.a5": {
+    id: "Fitur ini sedang kami siapkan: pemilik komunitas akan bisa mengundang host lain sebagai admin lewat email.",
+    en: "We're building this: a community owner will be able to invite other hosts as admins via email.",
+  },
 } as const;
 
 export type DictKey = keyof typeof DICT;
