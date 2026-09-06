@@ -1,12 +1,5 @@
-"use client";
-
-import { AppShell } from "@/components/app-shell";
-import { PasswordGate } from "@/components/password-gate";
+import { LandingPage } from "@/components/landing/landing-page";
 
 export default function HomePage() {
-  return (
-    <PasswordGate>
-      <AppShell />
-    </PasswordGate>
-  );
+  return <LandingPage />;
 }

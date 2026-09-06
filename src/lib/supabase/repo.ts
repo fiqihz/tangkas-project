@@ -628,6 +628,27 @@ export async function listResolvedMatches(
 }
 
 // ---------------------------------------------------------------------------
+// FEEDBACK (masukan dari landing page)
+// ---------------------------------------------------------------------------
+/**
+ * Kirim masukan dari pengunjung landing page. Boleh anonim (kontak opsional).
+ * Anon hanya diizinkan INSERT (lihat migration 010) — tidak bisa membaca
+ * masukan orang lain. Host membaca via dashboard/email notifikasi.
+ */
+export async function submitFeedback(
+  message: string,
+  contact?: string | null,
+): Promise<void> {
+  const trimmed = message.trim();
+  if (!trimmed) throw new Error("Pesan tidak boleh kosong.");
+  const trimmedContact = contact?.trim() || null;
+  const { error } = await db()
+    .from("feedback")
+    .insert({ message: trimmed, contact: trimmedContact });
+  if (error) throw error;
+}
+
+// ---------------------------------------------------------------------------
 // Helper konversi ke domain (dipakai UI)
 // ---------------------------------------------------------------------------
 export { toMatch, toSessionPlayer };

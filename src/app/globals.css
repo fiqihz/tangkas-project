@@ -19,6 +19,9 @@
   --input: 214 32% 91%;
   --ring: 142 71% 45%;
   --radius: 0.75rem;
+  /* Aksen sekunder teal "karpet lapangan" (landing). */
+  --accent: 179 84% 34%;
+  --accent-foreground: 0 0% 100%;
 }
 
 /* Dark mode class-based (toggle manual di menu Pengaturan). Diterapkan lewat
@@ -39,6 +42,9 @@
   --border: 217 33% 24%;
   --input: 217 33% 24%;
   --ring: 142 71% 45%;
+  /* Teal sedikit lebih terang di dark agar tetap terbaca di court-ink. */
+  --accent: 178 70% 41%;
+  --accent-foreground: 222 47% 11%;
 }
 
 * {
@@ -76,5 +82,62 @@ a,
 @keyframes shimmer {
   100% {
     transform: translateX(100%);
+  }
+}
+
+/* ── Landing: hero court diagram — satu orchestrated moment saat load ─────── */
+@keyframes court-draw {
+  from {
+    stroke-dashoffset: var(--dash, 600);
+  }
+  to {
+    stroke-dashoffset: 0;
+  }
+}
+@keyframes shuttle-drop {
+  0% {
+    opacity: 0;
+    transform: translateY(-14px) rotate(-8deg);
+  }
+  60% {
+    opacity: 1;
+  }
+  100% {
+    opacity: 1;
+    transform: translateY(0) rotate(0deg);
+  }
+}
+@keyframes player-pop {
+  from {
+    opacity: 0;
+    transform: scale(0.6);
+  }
+  to {
+    opacity: 1;
+    transform: scale(1);
+  }
+}
+
+.court-line-anim {
+  stroke-dasharray: var(--dash, 600);
+  animation: court-draw 1.1s ease-out forwards;
+}
+.shuttle-anim {
+  animation: shuttle-drop 0.7s 0.9s ease-out both;
+  transform-origin: center;
+}
+.player-anim {
+  animation: player-pop 0.4s ease-out both;
+}
+
+/* Hormati preferensi reduce-motion: tampilkan hasil akhir tanpa animasi. */
+@media (prefers-reduced-motion: reduce) {
+  .court-line-anim,
+  .shuttle-anim,
+  .player-anim {
+    animation: none;
+    stroke-dashoffset: 0;
+    opacity: 1;
+    transform: none;
   }
 }
