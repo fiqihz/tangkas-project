@@ -47,5 +47,20 @@ export function SheetContent({
   );
 }
 
-export const SheetTitle = Drawer.Title;
+/**
+ * Judul bottom sheet. Default pakai `font-display` (Space Grotesk) agar seragam
+ * dengan heading landing & screen /app. className tetap bisa menimpa.
+ */
+export function SheetTitle({
+  className,
+  ...props
+}: React.ComponentProps<typeof Drawer.Title>) {
+  return (
+    <Drawer.Title
+      className={cn("font-display tracking-tight", className)}
+      {...props}
+    />
+  );
+}
+
 export const SheetDescription = Drawer.Description;

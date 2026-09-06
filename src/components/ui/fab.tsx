@@ -32,7 +32,7 @@ export function Fab({
       )}
     >
       {icon}
-      {label && <span className="font-semibold">{label}</span>}
+      {label && <span className="font-display font-semibold tracking-tight">{label}</span>}
     </motion.button>
   );
 }

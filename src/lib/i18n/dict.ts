@@ -95,6 +95,7 @@ export const DICT = {
   "players.setLevel": { id: "Set level", en: "Set level" },
   "players.setGender": { id: "Set gender", en: "Set gender" },
   "players.notSet": { id: "(belum di-set)", en: "(not set)" },
+  "players.emptyTitle": { id: "Lapangan masih sepi", en: "The court is empty" },
   "players.empty": {
     id: "Belum ada pemain. Tap tombol + Pemain untuk menambah dari roster atau buat pemain baru.",
     en: "No players yet. Tap the + Player button to add from the roster or create a new one.",
@@ -125,6 +126,7 @@ export const DICT = {
     id: "Update otomatis tiap match selesai. Urut: menang → selisih poin → total poin. +M = bonus poin untuk jatah main yang tertinggal.",
     en: "Updates automatically after each match. Sorted by: wins → point diff → total points. +M = bonus points for missed play turns.",
   },
+  "leaderboard.emptyTitle": { id: "Papan skor menunggu", en: "Scoreboard awaits" },
   "leaderboard.empty": { id: "Belum ada hasil match.", en: "No match results yet." },
   "leaderboard.colPlayer": { id: "Pemain", en: "Player" },
   "leaderboard.winRate": { id: "Win rate", en: "Win rate" },
@@ -309,6 +311,7 @@ export const DICT = {
   // Sessions list (landing)
   "sessions.subtitle": { id: "Daftar Mabar", en: "Session List" },
   "sessions.roster": { id: "Roster", en: "Roster" },
+  "sessions.emptyTitle": { id: "Belum ada mabar", en: "No sessions yet" },
   "sessions.empty": {
     id: "Belum ada mabar. Tap tombol + Mabar untuk mulai atau menjadwalkan.",
     en: "No sessions yet. Tap the + Session button to start or schedule one.",
@@ -604,8 +607,8 @@ export const DICT = {
   },
   "landing.faq.q5": { id: "Bisakah beberapa host mengelola satu komunitas?", en: "Can several hosts manage one community?" },
   "landing.faq.a5": {
-    id: "Fitur ini sedang kami siapkan: pemilik komunitas akan bisa mengundang host lain sebagai admin lewat email.",
-    en: "We're building this: a community owner will be able to invite other hosts as admins via email.",
+    id: "Bisa. Pemilik komunitas dapat mengundang host lain sebagai admin lewat email untuk mengelola komunitas bersama.",
+    en: "Yes. A community owner can invite other hosts as admins via email to manage the community together.",
   },
 
   // ==========================================================================

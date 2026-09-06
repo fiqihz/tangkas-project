@@ -2,6 +2,7 @@
 
 import { useState, type FormEvent } from "react";
 import Link from "next/link";
+import Image from "next/image";
 import { useRouter } from "next/navigation";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
@@ -145,6 +146,14 @@ export default function LoginPage() {
         onClick={onGoogle}
         disabled={submitting}
       >
+        <Image
+          src="/google.png"
+          alt=""
+          aria-hidden
+          width={18}
+          height={18}
+          className="h-[18px] w-[18px] shrink-0 object-contain"
+        />
         {t("auth.loginGoogle")}
       </Button>
 

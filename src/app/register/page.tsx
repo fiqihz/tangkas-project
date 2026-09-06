@@ -2,6 +2,7 @@
 
 import { Suspense, useEffect, useState } from "react";
 import Link from "next/link";
+import Image from "next/image";
 import { useRouter, useSearchParams } from "next/navigation";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
@@ -164,6 +165,14 @@ function RegisterForm() {
           disabled={submitting}
           onClick={onGoogle}
         >
+          <Image
+            src="/google.png"
+            alt=""
+            aria-hidden
+            width={18}
+            height={18}
+            className="h-[18px] w-[18px] shrink-0 object-contain"
+          />
           {t("auth.registerGoogle")}
         </Button>
 

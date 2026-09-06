@@ -58,7 +58,7 @@ export function RosterScreen({ onClose }: { onClose: () => void }) {
           <ChevronLeft size={22} />
         </button>
         <div>
-          <div className="font-bold leading-tight">
+          <div className="font-display font-bold leading-tight tracking-tight">
             {selected ? selected.name : "Roster & Statistik"}
           </div>
           <div className="text-xs text-muted-foreground">
