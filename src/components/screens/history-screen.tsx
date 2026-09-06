@@ -10,7 +10,7 @@ import { haptic } from "@/lib/haptics";
 import { cn } from "@/lib/utils";
 import { EditScoreDialog } from "@/components/dialogs/edit-score-dialog";
 
-export function HistoryScreen() {
+export function HistoryScreen({ readOnly = false }: { readOnly?: boolean } = {}) {
   const { matches, players } = useSessionStore();
   const t = useT();
   const [editFor, setEditFor] = useState<Match | null>(null);
@@ -67,10 +67,16 @@ export function HistoryScreen() {
                   matchNumber={idx + 1}
                   byId={byId}
                   t={t}
-                  onEdit={() => {
-                    haptic(10);
-                    setEditFor(m);
-                  }}
+                  // Mode read-only (dibuka dari hasil mabar finished): sembunyikan
+                  // tombol edit skor — host hanya melihat, tidak mengubah.
+                  onEdit={
+                    readOnly
+                      ? undefined
+                      : () => {
+                          haptic(10);
+                          setEditFor(m);
+                        }
+                  }
                 />
               ))}
             </div>
@@ -100,7 +106,7 @@ function MatchHistoryRow({
   matchNumber: number;
   byId: Map<string, SessionPlayer>;
   t: ReturnType<typeof useT>;
-  onEdit: () => void;
+  onEdit?: () => void;
 }) {
   const name = (id: string) => byId.get(id)?.name ?? "?";
   const level = (id: string) => byId.get(id)?.level ?? null;
@@ -127,7 +133,7 @@ function MatchHistoryRow({
             </span>
           )}
         </span>
-        {!unfinished && (
+        {!unfinished && onEdit && (
           <button
             onClick={onEdit}
             className="flex h-8 w-8 items-center justify-center rounded-lg text-muted-foreground active:scale-90 active:bg-secondary"

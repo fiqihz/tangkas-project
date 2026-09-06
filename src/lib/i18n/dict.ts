@@ -402,12 +402,12 @@ export const DICT = {
   "addPlayer.playerName": { id: "Nama pemain", en: "Player name" },
   "addPlayer.dupName": { id: "Nama ini sudah ada di sesi.", en: "This name already exists in the session." },
   "addPlayer.levelHint": {
-    id: "Level (opsional — bisa di-set nanti saat match berjalan)",
-    en: "Level (optional — can be set later during the match)",
+    id: "Level (Dapat diganti kapan aja)",
+    en: "Level (Can be changed anytime)",
   },
   "addPlayer.genderHint": {
-    id: "Gender (opsional — untuk mode campuran & ganda putri)",
-    en: "Gender (optional — for mixed & ladies doubles modes)",
+    id: "Gender (Dapat diganti kapan aja)",
+    en: "Gender (Can be changed anytime)",
   },
   "addPlayer.submit": { id: "Tambah pemain", en: "Add player" },
 
@@ -426,6 +426,8 @@ export const DICT = {
     id: "Tidak ada pemain yang bermain di sesi ini.",
     en: "No players took part in this session.",
   },
+  "result.tabResult": { id: "Hasil", en: "Result" },
+  "result.tabHistory": { id: "History", en: "History" },
 } as const;
 
 export type DictKey = keyof typeof DICT;

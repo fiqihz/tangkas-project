@@ -88,10 +88,13 @@ export function buildLeaderboard(players: SessionPlayer[]): LeaderboardRow[] {
       losses: p.losses,
       draws: p.draws,
       played,
-      pointsScored: p.pointsScored,
+      // Bonus +M ditambahkan ke total poin (bukan ke Diff). Poin = skor asli
+      // + bonus jatah main tertinggal, sehingga pemain yang jarang kebagian
+      // main tetap terangkat lewat kolom Poin.
+      pointsScored: p.pointsScored + bonus,
       pointsConceded: p.pointsConceded,
-      // Selisih poin sudah termasuk bonus (bonus menambah kekuatan poin pemain).
-      pointDiff: p.pointsScored - p.pointsConceded + bonus,
+      // Selisih poin murni: skor asli dikurangi kebobolan (tanpa bonus).
+      pointDiff: p.pointsScored - p.pointsConceded,
       bonus,
       winRate,
     };

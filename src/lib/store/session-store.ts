@@ -168,6 +168,27 @@ const inFlight = new Set<string>();
  * selesai lebih dulu. Pemain tetap ada di match berjalannya (tidak dicabut);
  * ini hanya booking untuk match berikutnya.
  */
+/**
+ * Peringkat numerik level untuk perbandingan "jomplang" (best-effort balance).
+ * newbie < beginner < intermediate < advanced. Hanya dipakai untuk pemain yang
+ * sudah pasti ber-level (pool menunggu & kandidat reserve keduanya di-filter
+ * level !== null), jadi tak perlu menangani null.
+ */
+const LEVEL_RANK: Record<Level, number> = {
+  newbie: 0,
+  beginner: 1,
+  intermediate: 2,
+  advanced: 3,
+};
+
+/** Rata-rata peringkat level; abaikan pemain tanpa level. null bila tak ada. */
+function averageLevelRank(players: SessionPlayer[]): number | null {
+  const leveled = players.filter((p) => p.level !== null);
+  if (leveled.length === 0) return null;
+  const sum = leveled.reduce((s, p) => s + LEVEL_RANK[p.level as Level], 0);
+  return sum / leveled.length;
+}
+
 function reservablePlayingPlayers(
   matches: Match[],
   players: SessionPlayer[],
@@ -771,7 +792,28 @@ export const useSessionStore = create<SessionState>((set, get) => ({
         (p) => p.level !== null && !waitingIds.has(p.id),
       );
       const need = 4 - pool.length;
-      pool = [...pool, ...reserved.slice(0, need)];
+      // Best-effort level balance: dari kandidat reserve (sudah terurut durasi
+      // terlama), dahulukan yang level-nya paling dekat dengan rata-rata level
+      // pemain menunggu — supaya pool tidak terlalu jomplang. Tidak strict:
+      // kalau semua kandidat sama-sama jauh, urutan durasi tetap menang lewat
+      // tie-break. Bila tidak ada acuan (pool kosong), pakai urutan durasi apa
+      // adanya.
+      const target = averageLevelRank(pool);
+      const picked =
+        target === null
+          ? reserved.slice(0, need)
+          : reserved
+              .map((p, i) => ({ p, i }))
+              .sort((a, b) => {
+                // Kandidat sudah di-filter level !== null di atas.
+                const da = Math.abs(LEVEL_RANK[a.p.level as Level] - target);
+                const db = Math.abs(LEVEL_RANK[b.p.level as Level] - target);
+                if (da !== db) return da - db; // makin dekat rata-rata, makin diutamakan
+                return a.i - b.i; // tie-break: pertahankan urutan durasi terlama
+              })
+              .slice(0, need)
+              .map((x) => x.p);
+      pool = [...pool, ...picked];
     }
     // mustInclude = semua pemain menunggu (maks 4). Bila menunggu >= 4, biarkan
     // matchmaking bebas memilih 4 terbaik dari antrian (jangan paksa semua).

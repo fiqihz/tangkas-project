@@ -208,6 +208,9 @@ function ReadOnlyResult() {
   const t = useT();
   const rows = buildLeaderboard(players.filter((p) => p.gamesPlayed > 0));
   const [toast, setToast] = useState<string | null>(null);
+  // Tab di layar hasil finished: "result" (leaderboard) + "history" (daftar
+  // match per lapangan, read-only) agar host bisa menengok tiap skor match.
+  const [resultTab, setResultTab] = useState<"result" | "history">("result");
 
   const share = async () => {
     if (!session) return;
@@ -256,7 +259,41 @@ function ReadOnlyResult() {
       </header>
 
       <main className="flex-1 overflow-y-auto p-4 pb-8">
-        {rows.length === 0 ? (
+        {/* Tab switcher: Hasil (leaderboard) / History (daftar match read-only) */}
+        <div className="mb-4 flex gap-1 rounded-xl bg-secondary p-1">
+          <button
+            onClick={() => {
+              haptic(6);
+              setResultTab("result");
+            }}
+            className={cn(
+              "min-h-[40px] flex-1 select-none rounded-lg text-sm font-medium transition-all active:scale-[0.98]",
+              resultTab === "result"
+                ? "bg-background text-foreground shadow-sm"
+                : "text-muted-foreground",
+            )}
+          >
+            {t("result.tabResult")}
+          </button>
+          <button
+            onClick={() => {
+              haptic(6);
+              setResultTab("history");
+            }}
+            className={cn(
+              "min-h-[40px] flex-1 select-none rounded-lg text-sm font-medium transition-all active:scale-[0.98]",
+              resultTab === "history"
+                ? "bg-background text-foreground shadow-sm"
+                : "text-muted-foreground",
+            )}
+          >
+            {t("result.tabHistory")}
+          </button>
+        </div>
+
+        {resultTab === "history" ? (
+          <HistoryScreen readOnly />
+        ) : rows.length === 0 ? (
           <p className="py-10 text-center text-sm text-muted-foreground">
             {t("result.noPlayers")}
           </p>
@@ -269,6 +306,12 @@ function ReadOnlyResult() {
                   <th className="px-2 py-2 text-left">{t("leaderboard.colPlayer")}</th>
                   <th className="px-2 py-2 text-center">M</th>
                   <th className="px-2 py-2 text-center">K</th>
+                  <th
+                    className="px-2 py-2 text-center"
+                    title={t("leaderboard.bonusTitle")}
+                  >
+                    +M
+                  </th>
                   <th className="px-2 py-2 text-center">Diff</th>
                   <th className="px-2 py-2 text-center">Poin</th>
                 </tr>
@@ -294,6 +337,9 @@ function ReadOnlyResult() {
                     <td className="px-2 py-2 font-medium">{r.name}</td>
                     <td className="px-2 py-2 text-center">{r.wins}</td>
                     <td className="px-2 py-2 text-center">{r.losses}</td>
+                    <td className="px-2 py-2 text-center text-primary">
+                      {r.bonus > 0 ? `+${r.bonus}` : "-"}
+                    </td>
                     <td className="px-2 py-2 text-center">
                       {r.pointDiff >= 0 ? "+" : ""}
                       {r.pointDiff}
