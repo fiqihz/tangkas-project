@@ -7,6 +7,14 @@ dipilih host saat Auto-fill) sudah diimplementasi** di branch
 `batch-g-gender-mode` (lihat §16) — detail rancangan di
 `.kiro/steering/batch-g-gender-rotation.md`.
 
+**Go-Public Fase 1 (Landing Page + Feedback) sudah diimplementasi** di branch
+`feat/landing-feedback` (lihat §17). Aplikasi inti kini berada di route `/app`;
+route `/` menjadi landing page publik. **Go-Public Fase 2 (Auth + Multi-Tenant)
+sudah diimplementasi & di-merge ke `main`** (lihat §18) — Supabase Auth
+(Email/Password + Google), model tenant multi-komunitas (`membership`/`invite`),
+role `owner`/`admin`, invite admin email-bound, dan RLS ketat per-community. Spec
+lengkap di `.kiro/specs/phase-2-auth-multitenant/`.
+
 ---
 
 ## 1. Tujuan
@@ -32,9 +40,12 @@ Bentuk: **PWA** mobile-first, di-hosting gratis.
 | Data store | **Full Supabase** (roster permanen + data sesi) |
 | Hosting | Vercel free tier, auto-deploy dari GitHub |
 | Level system | **Full manual** (host set/edit). **Tidak ada Elo / promosi otomatis.** |
-| Akses (sekarang) | **Opsi B — satu password bersama** (gembok client-side) |
-| Akses (masa depan) | **Opsi C — multi-komunitas + login + role** (skema disiapkan multi-tenant, belum diimplementasi) |
+| Akses (sekarang) | **Opsi C — Supabase Auth (Email/Password + Google) + multi-komunitas + role `owner`/`admin`** (PasswordGate Opsi B sudah di-retire, lihat §18) |
+| Akses (masa depan) | Role `member` **read-only** menyusul (skema sudah disiapkan, jalur masuk non-invite di luar scope Fase 2) |
 | Match pertama | **Selalu manual** (first come first play) |
+| Routing | **`/` = landing page publik**, **`/app` = aplikasi inti** (di balik **route guard berbasis sesi Supabase**: redirect ke `/login` bila belum auth, `/onboarding` bila belum punya community — bukan lagi password gate) |
+| Landing | Mobile-first responsive, dwibahasa (ID/EN), tema light/dark bersama app |
+| Font | **Space Grotesk** (display) + **Inter** (body) via `next/font` |
 
 ---
 
@@ -174,18 +185,32 @@ Semua penggantian tetap patuh hard rule (Newbie+Newbie ditolak).
 
 ## 12. Arsitektur Data (Supabase)
 
-Multi-tenant sejak awal (untuk jalan ke Opsi C):
+Multi-tenant nyata (Opsi C aktif sejak Fase 2, lihat §18):
 
-- **community** — tenant (sekarang 1 default, digembok password Opsi B).
+- **community** — tenant nyata per user. Bukan lagi "1 default digembok password":
+  tiap user membuat community-nya sendiri saat onboarding dan menjadi `owner`.
+  Data lama (`community_id = DEFAULT_COMMUNITY_ID`) diklaim ke community pertama
+  yang dibuat user (lihat §18).
+- **membership** — relasi user↔community: `user_id`, `community_id`,
+  `role` (`owner`/`admin`/`member`), unik per pasangan user+community. Satu user
+  bisa jadi anggota banyak community → community switcher.
+- **invite** — undangan admin email-bound: `email`, `community_id`, `role` (admin),
+  `token`, `status`, `expires_at`, `invited_by`. Token sekali pakai + expiry 7 hari.
 - **player_profile** (roster, permanen) — nama + level + `sessions_played`. Tidak ter-reset antar mabar.
 - **session** — status (scheduled/ongoing/finished), courts, current_round, scheduled_at.
 - **session_player** — state pemain per mabar: status, level, `checked_in_at`, games_played, last_played_round, available_since_round, wins/losses/draws, points_scored/conceded, profile_id.
 - **court** — lapangan (label, position).
 - **match** — court_id, `court_label` (snapshot), round, 4 pemain, state, skor, winner.
 
-RLS aktif dengan policy permisif untuk anon (sesuai Opsi B — gembok di app). Realtime aktif di `match`, `session_player`, `court`.
+**RLS ketat per-community** menggantikan policy permisif anon `using(true)` lama.
+Helper `is_member()` / `has_role()` (SECURITY DEFINER): tabel induk (`community`,
+`player_profile`, `session`) mengecek `is_member(community_id)`; tabel anak
+(`session_player`, `court`, `match`) mengecek via join ke `session.community_id`.
+Write hanya untuk `authenticated`, dan operasi tulis `membership`/`invite`/pembuatan
+community dilakukan lewat RPC SECURITY DEFINER. Realtime aktif di `match`,
+`session_player`, `court`.
 
-Migrations (di `supabase/migrations/`): `001` sessions_played, `002` match state unfinished, `003` multi-status sesi, `004` match court_label, `005` checked_in_at, `006` gender (kolom `gender` di `player_profile` & `session_player`).
+Migrations (di `supabase/migrations/`): `001` sessions_played, `002` match state unfinished, `003` multi-status sesi, `004` match court_label, `005` checked_in_at, `006` gender (kolom `gender` di `player_profile` & `session_player`), `007` RPC atomik, `008` realtime filters, `009` match started_at, `010` **feedback** (tabel masukan landing + RLS anon insert-only), `011` **trigger notifikasi feedback** (via `net.http_post` → Edge Function, bypass UI Webhook), `012` **membership & invite** (enum `membership_role`/`invite_status`), `013` **RLS ketat + helper functions** (`is_member`/`has_role`), `014` **trigger `pg_net` → Edge Function `send-invite`**, `015` **RPC** (`create_community_with_owner`, `claim_legacy_data`, `redeem_invite`, `kick_member`), `016` **`redeem_invite` email-bound + `list_community_members_with_email`**.
 
 ---
 
@@ -213,9 +238,17 @@ Migrations (di `supabase/migrations/`): `001` sessions_played, `002` match state
 
 ---
 
-## 15. Roadmap (belum dikerjakan)
+## 15. Roadmap
 
-- **Opsi C**: Supabase Auth + multi-komunitas + role admin/member (host bisa dialihkan). Skema sudah multi-tenant, tinggal tambah auth + perketat RLS.
+- **Go-Public Fase 1 (landing + feedback)** — ✅ **selesai** (lihat §17).
+- **Go-Public Fase 2 = Opsi C** — ✅ **selesai & di-merge ke `main`** (lihat §18):
+  Supabase Auth (Google + Email/Password) + multi-komunitas + role
+  `owner`/`admin` + invite admin email-bound + RLS ketat + klaim data lama ke
+  community pertama.
+- **Enhancement UI/UX `/app`** — ✅ **selesai & di-merge ke `main`** (lihat §19).
+  Menyelaraskan visual app dengan landing (token & font bersama), plus polish
+  copy landing. Dikerjakan via Vibe; arah desain di
+  `.kiro/steering/phase-2-auth-multitenant.md` §4 + `FE-SKILL.MD`.
 
 ---
 
@@ -260,3 +293,228 @@ Catatan:
 - `session-store.ts`: `generateLockedPreview(courtId, mode)`, `setPlayerGender`, `addPlayer` terima gender.
 - UI: `gender-select.tsx` (`GenderSelect`+`GenderBadge`), `ModePickerSheet` di `courts-screen.tsx`.
 - DB: migration `006_gender.sql` — **harus dijalankan di Supabase sebelum tes gender**.
+
+---
+
+## 17. Go-Public Fase 1 — Landing Page + Feedback
+
+Status: **diimplementasi** di branch `feat/landing-feedback` (belum merge ke
+`main`). Langkah pertama membuka TangkasBoard untuk komunitas lain. Fase 2 (auth +
+multi-tenant) menyusul — rencana di `.kiro/steering/phase-2-auth-multitenant.md`.
+
+### Routing
+- **`/`** → **Landing page publik** (marketing). Server-friendly, responsive
+  desktop + mobile.
+- **`/app`** → **Aplikasi inti** (board mabar), tetap di balik `PasswordGate`
+  sementara sampai auth Fase 2. Layout tetap `max-w-md` mobile-native / PWA.
+
+### Landing page (`src/components/landing/`)
+- **Dwibahasa (ID/EN)** — semua wording di `src/lib/i18n/dict.ts` (prefix
+  `landing.*`). Toggle bahasa di navbar, berbagi `localStorage` key `tb.lang`
+  dengan app → pilihan konsisten saat masuk `/app`.
+- **Tema light/dark** — menumpang sistem token `dark` + `settings-store` yang
+  sama dengan app.
+- **Section**: navbar → hero (SVG court diagram 2v2, satu orchestrated moment saat
+  load) → "Apa itu" → **Cara Kerja (5 langkah, timeline ber-connector)** → Fitur
+  (kartu featured matchmaking + grid) → **FAQ (accordion)** → Feedback → footer.
+- **Cara Kerja 5 langkah**: (1) Daftar & buat komunitas, (2) buat mabar & daftar
+  pemain, (3) Smart Matchmaking, (4) catat skor, (5) tentukan juara.
+- **FAQ** memuat batasan yang sering ditanya: hanya **ganda** (single belum ada),
+  skor **1 set** (2–3 set on roadmap), keadilan matchmaking, multi-host (Fase 2).
+- **Desain** mengikuti `.claude/skills/anthropic-skills/FE-SKILL.MD`: sporty tapi
+  minimalist, motif lapangan badminton, palet dark-first + aksen teal, keterbacaan
+  diprioritaskan, menghindari "tell" AI-generated. Motion sekali & terarah,
+  `prefers-reduced-motion` dihormati.
+- **Logo**: `public/shuttlecock.png` (bukan emoji).
+
+### Fondasi visual bersama (dipakai ulang saat enhance `/app`)
+- Token warna `--accent` (teal) untuk light & dark di `globals.css`, mendampingi
+  `--primary` (hijau shuttle).
+- Font via `next/font`: **Space Grotesk** (`--font-display`) + **Inter**
+  (`--font-sans`). Tailwind `fontFamily.display`/`.sans` map ke sana.
+
+### Feedback
+- Tabel **`feedback`** (`message`, `contact` opsional) — migration `010`. RLS:
+  anon boleh **INSERT saja** (tidak bisa membaca masukan orang lain).
+- Form di landing → `submitFeedback()` (`src/lib/supabase/repo.ts`). Boleh anonim.
+- **Notifikasi email** ke host: trigger `AFTER INSERT` (migration `011`) memanggil
+  Edge Function `notify-feedback` (`supabase/functions/`) via `net.http_post`
+  (pg_net), lalu kirim email via **Resend**. Cara ini mem-bypass UI Database
+  Webhook dashboard yang gagal karena schema `supabase_functions` tidak
+  ter-provision di project. Secret (`RESEND_API_KEY`, `FEEDBACK_TO`,
+  `FEEDBACK_FROM`) disimpan di Supabase secrets, tidak di kode.
+
+### Catatan teknis
+- `tsc` & eslint meng-exclude `supabase/functions/**` (runtime Deno, bukan Next).
+- Asset landing di-serve dari `public/` (mis. `shuttlecock.png`).
+
+---
+
+## 18. Go-Public Fase 2 — Auth + Multi-Tenant
+
+Status: **diimplementasi & sudah di-merge ke `main`** (branch
+`feat/phase-2-auth-multitenant`). Langkah yang mengubah TangkasBoard dari satu
+komunitas digembok password (Opsi B) menjadi platform multi-tenant nyata dengan
+login (Opsi C). Spec lengkap (requirements/design/tasks) di
+`.kiro/specs/phase-2-auth-multitenant/`.
+
+### Autentikasi
+- **Supabase Auth** — Email/Password + Google (OAuth).
+- **PasswordGate lama di-retire**: `src/components/password-gate.tsx` &
+  `src/lib/auth/gate.ts` **dihapus**.
+- Supabase client `persistSession: true` (`client.ts`) → sesi bertahan antar reload.
+- **Route guard `/app` berbasis sesi** (`src/components/auth/route-guard.tsx` +
+  `guard-decision.ts`): belum auth → redirect `/login`; sudah auth tapi belum
+  punya community → redirect `/onboarding`.
+- **Email confirmation Supabase OFF** → register langsung punya sesi aktif.
+
+### Model tenant
+- Tabel **`membership`** (`user_id`, `community_id`, `role` `owner`/`admin`/`member`,
+  unik per user+community) & **`invite`** (`email`, `community_id`, `role` admin,
+  `token`, `status`, `expires_at`, `invited_by`).
+- Satu user bisa berada di banyak community → **community switcher**
+  (`src/components/app/community-switcher.tsx`).
+
+### Role
+- **`owner`** — pembuat community. Bisa hapus community & kelola admin. **Tidak
+  bisa di-kick**.
+- **`admin`** — view + edit data community.
+- **`member`** — read-only. Sudah disiapkan di skema, tapi **belum ada jalur
+  masuknya di Fase 2** (jalur non-invite di luar scope).
+
+### Invite admin (email-bound)
+- Owner **generate link undangan** — ditampilkan di dialog Kelola Admin untuk
+  di-share manual (mis. via WhatsApp). Email otomatis **juga** terkirim via Edge
+  Function bila domain Resend terverifikasi (lihat known limitations).
+- Link → `/register?invite=TOKEN` atau `/invite?token=TOKEN`.
+- **`redeem_invite` email-bound**: hanya bisa ditukar oleh user yang email
+  login-nya **sama** dengan email di invite (`reason: email_mismatch` bila beda).
+- Mendukung **user baru** (register via link) & **user existing** (sudah login →
+  langsung jadi admin, auto-switch ke komunitas pengundang; komunitas lama user
+  tetap utuh).
+- Token **sekali pakai + expiry 7 hari**.
+
+### Kelola admin (owner-only)
+`src/components/app/manage-admins-dialog.tsx`:
+- Generate link undangan.
+- Daftar member — menampilkan **EMAIL** via RPC owner-only
+  `list_community_members_with_email`.
+- **Kick** member non-owner.
+- **Hapus community**.
+
+### RLS ketat per-community
+Menggantikan policy permisif anon `using(true)` lama:
+- Helper `is_member()` / `has_role()` **SECURITY DEFINER**.
+- Tabel induk (`community`, `player_profile`, `session`) cek `is_member(community_id)`.
+- Tabel anak (`session_player`, `court`, `match`) cek via join ke `session.community_id`.
+- Write hanya `authenticated`. Operasi tulis `membership`/`invite`/pembuatan
+  community lewat RPC SECURITY DEFINER.
+
+### Migrasi data lama
+Baris dengan `community_id = DEFAULT_COMMUNITY_ID`
+(`00000000-0000-0000-0000-000000000001`) diklaim ke community **pertama** yang
+dibuat user saat onboarding (RPC `create_community_with_owner` →
+`claim_legacy_data`, **idempoten**).
+
+### Halaman baru
+- **`/login`**, **`/register`**, **`/onboarding`**, **`/auth/callback`**, **`/invite`**.
+- Onboarding: user tanpa community → buat community (otomatis jadi `owner`).
+- Tombol **logout** di Settings (juga bisa diakses dari header daftar mabar).
+- Semua wording baru dwibahasa di `dict.ts`.
+
+### Edge Function
+- **`supabase/functions/send-invite`** (Resend, mengikuti pola `notify-feedback`).
+
+### Testing
+- **vitest + fast-check**. ~**84 test passed**.
+- **Property tests**: redeem invite (expired/idempoten), klaim data (idempoten &
+  preserve kolom), invite role admin-only, resolusi `active_community`.
+- **Unit test**: form validation, `guard-decision`, invite-link.
+- **Integration test DB**: auto-skip tanpa env.
+
+### Migrations
+- `012` membership & invite (enum `membership_role`/`invite_status`).
+- `013` RLS ketat + helper functions (`is_member`/`has_role`).
+- `014` trigger `pg_net` → Edge Function `send-invite`.
+- `015` RPC (`create_community_with_owner`, `claim_legacy_data`, `redeem_invite`,
+  `kick_member`).
+- `016` `redeem_invite` email-bound + `list_community_members_with_email`.
+
+### Known limitations
+- **Email invite ke pihak ketiga butuh verifikasi domain Resend** (belum
+  dilakukan). Sementara memakai `onboarding@resend.dev` yang hanya bisa mengirim
+  ke email pemilik akun → untuk sekarang share link undangan manual.
+- **Auth email confirmation Supabase OFF** (register langsung punya sesi).
+- Halaman **`/invite`** untuk user yang sudah login kadang perlu **refresh
+  manual** (known minor issue).
+
+Rujukan spec: `.kiro/specs/phase-2-auth-multitenant/`
+(requirements / design / tasks).
+
+---
+
+## 19. Enhancement Visual `/app` + Polish Landing
+
+Status: **diimplementasi & di-merge ke `main`** (branch `feat/app-visual-enhance`
+untuk enhancement `/app`; polish copy landing di-commit langsung). Fase terakhir
+dari go-public: menyelaraskan **bahasa visual** `/app` dengan landing, tanpa
+mengubah layout/struktur/alur yang sudah teruji. Mengikuti batasan di
+`.kiro/steering/phase-2-auth-multitenant.md` §4 + `FE-SKILL.MD`.
+
+### Prinsip (koridor yang dipatuhi)
+- **Samakan bahasa visual (palet, tipografi, gaya komponen), BUKAN layout.**
+  Landing boleh lebar/desktop; `/app` tetap sempit/mobile-native (`max-w-md`).
+- **Jangan ubah** struktur/fungsi teruji (app-shell, bottom nav, alur
+  matchmaking, screens) & mekanisme PWA.
+- Token warna + font memang **satu sumber** (`globals.css` + `layout.tsx`) yang
+  sudah dibagi landing & app → palet identik sejak awal. Yang belum nyambung
+  hanya **pemakaian `font-display`** di `/app` (sebelumnya 0 pemakaian).
+- Motion **tidak** ditambah — motion existing (spring tab, screen transition,
+  stagger kartu, FAB) sudah disiplin sesuai FE-SKILL; menambah animasi justru
+  jadi "tell" AI-generated.
+
+### Enhancement `/app`
+- **Tipografi** — `font-display` (Space Grotesk) diterapkan di heading kunci:
+  nama sesi di header board (`app-shell.tsx`), judul screen
+  (leaderboard/history/finish), header daftar mabar/roster/settings, kartu sesi,
+  `CardTitle` (`ui/card.tsx`), `SheetTitle` (`ui/sheet.tsx` — dibungkus agar
+  default `font-display`), label FAB (`ui/fab.tsx`).
+- **Motif court di empty state** — komponen baru `src/components/ui/empty-court.tsx`
+  (`EmptyCourt` + `CourtGlyph`): SVG lapangan mini (petak + net teal + shuttle),
+  statis & ikut tema. Dipakai di empty state **Daftar Mabar**, **Pemain**, dan
+  **Leaderboard** (menggantikan teks dashed polos). Membawa bahasa visual landing
+  (`court-diagram.tsx`) ke tempat yang tepat, bukan dekorasi acak.
+- **Ikon shuttlecock** — emoji 🏸 diganti gambar `public/shuttlecock.png` di
+  header board & daftar mabar, halaman error (`error.tsx`, `global-error.tsx` —
+  yang terakhir pakai `<img>` biasa, bukan `next/image`, agar root error boundary
+  tetap bebas dependency), dan dialog tambah pemain. Emoji di **teks** (share
+  result `share-result.ts`, label tombol `createSession.startNow`) sengaja
+  dibiarkan karena itu string, bukan elemen UI.
+- **Ikon Google** — tombol "Masuk/Daftar dengan Google" di `/login` & `/register`
+  kini ber-ikon `public/google.png` (`{icon} teks`). Aset sumber di `asset/`.
+
+### Fix UX — redundansi opsi "Match Pertama"
+- `ModePickerSheet` (`courts-screen.tsx`) dipakai di **dua konteks**: dari kartu
+  lapangan **kosong** ("Smart Matchmaking") dan dari lapangan **berjalan**
+  ("Auto-fill"). Di lapangan kosong, opsi "Match Pertama" di dalam sheet
+  **redundan** karena kartu sudah punya tombol First Match tersendiri.
+- Solusi: prop `showFirstMatch` — sheet menyembunyikan opsi First Match **hanya
+  saat dibuka dari lapangan kosong**; di lapangan berjalan tetap ditampilkan
+  (di sana itu satu-satunya jalan menyusun match pertama untuk pemain gelombang
+  baru). Fungsi tidak dihapus, hanya disembunyikan sesuai konteks.
+
+### Polish copy landing (rencana monetisasi)
+- **Hapus semua nuansa "gratis"** karena rencana berbayar setelah pengguna
+  banyak: badge hero "Gratis untuk komunitas badminton" → "Matchmaking adil untuk
+  mabar badminton"; CTA "Mulai gratis" → "Mulai"; FAQ "Apakah TangkasBoard
+  gratis?" → "Perlu install aplikasi?" (jawaban PWA).
+- **Fix jumlah langkah** — subtitle Cara Kerja "Empat langkah" → "**Lima
+  langkah**" (sesuai 5 langkah yang ada).
+- **FAQ multi-host** — jawaban "Bisakah beberapa host mengelola satu komunitas?"
+  diubah dari "sedang disiapkan" → **"Bisa"** (fitur sudah ada sejak Fase 2, §18).
+- Semua wording di `src/lib/i18n/dict.ts` (dwibahasa `{ id, en }`).
+
+### Verifikasi
+Tiap perubahan lolos `npm run typecheck` + `npm run lint` + `npm run build`
+(exit 0). Build sekaligus memastikan `/app` tidak jebol akibat perubahan token/
+komponen bersama.
