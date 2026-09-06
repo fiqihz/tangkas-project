@@ -443,7 +443,7 @@ export const DICT = {
   "landing.langToggle": { id: "EN", en: "ID" },
 
   // Hero
-  "landing.hero.badge": { id: "Gratis untuk komunitas badminton", en: "Free for badminton communities" },
+  "landing.hero.badge": { id: "Matchmaking adil untuk mabar badminton", en: "Fair matchmaking for badminton sessions" },
   "landing.hero.title": {
     id: "Atur mabar. Bagi lapangan. Adil.",
     en: "Run sessions. Split courts. Fairly.",
@@ -452,7 +452,7 @@ export const DICT = {
     id: "TangkasBoard menyusun tim, mencatat skor, dan menentukan juara secara otomatis — biar kamu tinggal main.",
     en: "TangkasBoard builds teams, records scores, and crowns the champion automatically — so you can just play.",
   },
-  "landing.hero.ctaPrimary": { id: "Mulai gratis", en: "Start free" },
+  "landing.hero.ctaPrimary": { id: "Mulai", en: "Get started" },
   "landing.hero.ctaSecondary": { id: "Lihat cara kerja", en: "See how it works" },
   "landing.hero.note": { id: "Bisa dipasang di HP · Dipakai langsung di GOR", en: "Installs on your phone · Built for the court" },
 
@@ -466,8 +466,8 @@ export const DICT = {
   // How it works
   "landing.how.title": { id: "Cara Kerjanya", en: "How It Works" },
   "landing.how.subtitle": {
-    id: "Empat langkah sederhana dari daftar pemain sampai juara.",
-    en: "Four simple steps from player list to champion.",
+    id: "Lima langkah sederhana dari daftar pemain sampai juara.",
+    en: "Five simple steps from player list to champion.",
   },
   "landing.how.step1.title": { id: "Buat mabar & daftar pemain", en: "Create a session & add players" },
   "landing.how.step1.body": {
@@ -585,10 +585,10 @@ export const DICT = {
     id: "Hal-hal yang biasa ditanyakan host sebelum mulai.",
     en: "What hosts usually ask before getting started.",
   },
-  "landing.faq.q1": { id: "Apakah TangkasBoard gratis?", en: "Is TangkasBoard free?" },
+  "landing.faq.q1": { id: "Perlu install aplikasi?", en: "Do I need to install an app?" },
   "landing.faq.a1": {
-    id: "Ya. Kamu bisa membuat komunitas, mendaftarkan pemain, dan mengelola mabar tanpa biaya.",
-    en: "Yes. You can create a community, register players, and run sessions at no cost.",
+    id: "Tidak wajib. TangkasBoard jalan langsung di browser, tapi bisa dipasang ke layar utama HP (PWA) agar terbuka seperti aplikasi biasa saat di GOR.",
+    en: "Not required. TangkasBoard runs right in the browser, but you can install it to your phone's home screen (PWA) so it opens like a native app at the court.",
   },
   "landing.faq.q2": { id: "Apakah mendukung tunggal (single)?", en: "Does it support singles?" },
   "landing.faq.a2": {
