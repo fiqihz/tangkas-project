@@ -1,6 +1,7 @@
 "use client";
 
 import { useEffect, useState } from "react";
+import Image from "next/image";
 import { motion } from "framer-motion";
 import {
   LayoutGrid,
@@ -134,9 +135,15 @@ function AppShellContent() {
           >
             <ChevronLeft size={22} />
           </button>
-          <span className="text-xl">🏸</span>
+          <Image
+            src="/shuttlecock.png"
+            alt="TangkasBoard"
+            width={24}
+            height={24}
+            className="h-6 w-6 shrink-0 object-contain"
+          />
           <div className="min-w-0 flex-1">
-            <div className="truncate font-bold leading-tight">
+            <div className="truncate font-display font-bold leading-tight tracking-tight">
               {session.name}
             </div>
             <div className="text-xs text-muted-foreground">
@@ -241,7 +248,7 @@ function ReadOnlyResult() {
           </button>
           <span className="text-xl">🏁</span>
           <div className="min-w-0 flex-1">
-            <div className="truncate font-bold leading-tight">
+            <div className="truncate font-display font-bold leading-tight tracking-tight">
               {session?.name}
             </div>
             <div className="text-xs text-muted-foreground">

@@ -24,6 +24,7 @@ import type { DictKey } from "@/lib/i18n/dict";
 import { haptic } from "@/lib/haptics";
 import { cn } from "@/lib/utils";
 import { AddPlayerDialog } from "@/components/dialogs/add-player-dialog";
+import { EmptyCourt } from "@/components/ui/empty-court";
 
 const STATUS_LABEL_KEY: Record<PlayerStatus, DictKey> = {
   registered: "players.status.registered",
@@ -127,9 +128,10 @@ export function PlayersScreen() {
   return (
     <div className="flex flex-col gap-5">
       {players.length === 0 && (
-        <div className="rounded-xl border border-dashed border-border p-6 text-center text-sm text-muted-foreground">
-          {t("players.empty")}
-        </div>
+        <EmptyCourt
+          title={t("players.emptyTitle")}
+          description={t("players.empty")}
+        />
       )}
 
       {players.length > 0 && (

@@ -43,7 +43,9 @@ export function HistoryScreen({ readOnly = false }: { readOnly?: boolean } = {})
   return (
     <div className="flex flex-col gap-5">
       <div>
-        <h2 className="text-lg font-bold">{t("history.title")}</h2>
+        <h2 className="font-display text-lg font-bold tracking-tight">
+          {t("history.title")}
+        </h2>
         <p className="text-sm text-muted-foreground">
           {t("history.subtitle")}
         </p>

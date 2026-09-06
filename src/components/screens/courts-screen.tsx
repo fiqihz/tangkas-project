@@ -297,6 +297,12 @@ export function CourtsScreen() {
       {modeForCourt && (
         <ModePickerSheet
           firstMatchEligible={firstMatchEligible}
+          // Sembunyikan opsi "Match Pertama" di dalam sheet bila sheet dibuka
+          // dari lapangan KOSONG — di sana sudah ada tombol First Match sendiri
+          // di kartu (hindari redundansi). Di lapangan yang sedang jalan
+          // (Auto-fill), sheet TETAP menampilkannya karena itu satu-satunya
+          // jalan menyusun match pertama untuk pemain gelombang baru.
+          showFirstMatch={!!playingMatchByCourt(modeForCourt)}
           onClose={() => setModeForCourt(null)}
           onPick={async (mode) => {
             const courtId = modeForCourt;
@@ -738,11 +744,15 @@ const MODE_OPTIONS: {
 
 function ModePickerSheet({
   firstMatchEligible,
+  showFirstMatch,
   onPick,
   onPickFirstMatch,
   onClose,
 }: {
   firstMatchEligible: boolean;
+  /** Tampilkan opsi "Match Pertama" di dalam sheet. False untuk lapangan kosong
+   *  (sudah punya tombol tersendiri di kartu → hindari redundansi). */
+  showFirstMatch: boolean;
   onPick: (mode: MatchMode) => void;
   onPickFirstMatch: () => void;
   onClose: () => void;
@@ -762,41 +772,48 @@ function ModePickerSheet({
         </p>
         <div className="mt-4 flex flex-col gap-2">
           {/* Match Pertama: hanya untuk pemain yang belum pernah main (0x),
-              disusun murni berdasarkan urutan check-in (abaikan level). */}
-          <button
-            onClick={() => {
-              haptic(12);
-              if (!firstMatchEligible) {
-                setFirstMatchAlert(true);
-                return;
-              }
-              onPickFirstMatch();
-            }}
-            className={cn(
-              "flex select-none items-start gap-3 rounded-xl border px-3.5 py-3 text-left transition-all active:scale-[0.99]",
-              firstMatchEligible
-                ? "border-primary/40 bg-primary/10 active:bg-primary/20"
-                : "border-border bg-secondary/40 opacity-60 active:bg-secondary",
-            )}
-          >
-            <span className="text-xl leading-none">🔢</span>
-            <span className="flex min-w-0 flex-col gap-0.5">
-              <span className="font-semibold">{t("mode.firstMatch")}</span>
-              <span className="text-xs text-muted-foreground">
-                {firstMatchEligible
-                  ? t("mode.firstMatchDescOk")
-                  : t("mode.firstMatchDescNo")}
-              </span>
-            </span>
-          </button>
+              disusun murni berdasarkan urutan check-in (abaikan level).
+              Ditampilkan hanya bila sheet dibuka dari lapangan yang sedang
+              jalan — di lapangan kosong opsi ini sudah ada sebagai tombol
+              tersendiri di kartu (hindari redundansi). */}
+          {showFirstMatch && (
+            <>
+              <button
+                onClick={() => {
+                  haptic(12);
+                  if (!firstMatchEligible) {
+                    setFirstMatchAlert(true);
+                    return;
+                  }
+                  onPickFirstMatch();
+                }}
+                className={cn(
+                  "flex select-none items-start gap-3 rounded-xl border px-3.5 py-3 text-left transition-all active:scale-[0.99]",
+                  firstMatchEligible
+                    ? "border-primary/40 bg-primary/10 active:bg-primary/20"
+                    : "border-border bg-secondary/40 opacity-60 active:bg-secondary",
+                )}
+              >
+                <span className="text-xl leading-none">🔢</span>
+                <span className="flex min-w-0 flex-col gap-0.5">
+                  <span className="font-semibold">{t("mode.firstMatch")}</span>
+                  <span className="text-xs text-muted-foreground">
+                    {firstMatchEligible
+                      ? t("mode.firstMatchDescOk")
+                      : t("mode.firstMatchDescNo")}
+                  </span>
+                </span>
+              </button>
 
-          {firstMatchAlert && !firstMatchEligible && (
-            <div className="rounded-xl border border-amber-300 bg-amber-50 px-3 py-2.5 text-sm text-amber-900 dark:border-amber-900 dark:bg-amber-950/40 dark:text-amber-100">
-              {t("mode.firstMatchAlert")}
-            </div>
+              {firstMatchAlert && !firstMatchEligible && (
+                <div className="rounded-xl border border-amber-300 bg-amber-50 px-3 py-2.5 text-sm text-amber-900 dark:border-amber-900 dark:bg-amber-950/40 dark:text-amber-100">
+                  {t("mode.firstMatchAlert")}
+                </div>
+              )}
+
+              <div className="my-1 h-px bg-border" />
+            </>
           )}
-
-          <div className="my-1 h-px bg-border" />
 
           {MODE_OPTIONS.map((m) => (
             <button

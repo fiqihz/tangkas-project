@@ -1,6 +1,7 @@
 "use client";
 
 import { useEffect } from "react";
+import Image from "next/image";
 
 /**
  * Error boundary level route (App Router). Menangkap error render/efek di
@@ -23,7 +24,14 @@ export default function Error({
 
   return (
     <main className="mx-auto flex min-h-dvh max-w-sm flex-col items-center justify-center gap-5 p-6 text-center">
-      <div className="text-5xl">🏸</div>
+      <Image
+        src="/shuttlecock.png"
+        alt=""
+        aria-hidden
+        width={64}
+        height={64}
+        className="h-16 w-16 object-contain"
+      />
       <div>
         <h1 className="text-xl font-bold">Ada yang tidak beres</h1>
         <p className="mt-1 text-sm text-muted-foreground">

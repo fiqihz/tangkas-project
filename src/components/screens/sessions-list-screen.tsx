@@ -1,6 +1,7 @@
 "use client";
 
 import { useMemo, useState } from "react";
+import Image from "next/image";
 import { motion } from "framer-motion";
 import { Plus, Play, RotateCcw, Trash2, CalendarClock, Eye, BarChart3, Settings, ChevronLeft } from "lucide-react";
 import { Button } from "@/components/ui/button";
@@ -18,6 +19,7 @@ import { CreateSessionDialog } from "@/components/dialogs/create-session-dialog"
 import { RosterScreen } from "@/components/screens/roster-screen";
 import { SettingsScreen } from "@/components/screens/settings-screen";
 import { CommunitySwitcher } from "@/components/app/community-switcher";
+import { EmptyCourt } from "@/components/ui/empty-court";
 
 const STATUS_META: Record<
   SessionStatus,
@@ -72,7 +74,9 @@ export function SessionsListScreen() {
           >
             <ChevronLeft size={22} />
           </button>
-          <div className="font-bold leading-tight">{t("settings.title")}</div>
+          <div className="font-display font-bold leading-tight tracking-tight">
+            {t("settings.title")}
+          </div>
         </header>
         <main className="flex-1 overflow-y-auto p-4 pb-28">
           <SettingsScreen />
@@ -86,9 +90,18 @@ export function SessionsListScreen() {
       <header className="flex flex-col gap-2 border-b border-border px-4 py-3 pt-[calc(env(safe-area-inset-top)+0.75rem)]">
         <div className="flex items-center justify-between gap-2">
           <div className="flex min-w-0 items-center gap-2">
-            <span className="text-xl">🏸</span>
+            <Image
+              src="/shuttlecock.png"
+              alt="TangkasBoard"
+              width={24}
+              height={24}
+              className="h-6 w-6 shrink-0 object-contain"
+              priority
+            />
             <div className="min-w-0">
-              <div className="truncate font-bold leading-tight">TangkasBoard</div>
+              <div className="truncate font-display font-bold leading-tight tracking-tight">
+                TangkasBoard
+              </div>
               <div className="truncate text-xs text-muted-foreground">
                 {t("sessions.subtitle")}
               </div>
@@ -127,8 +140,11 @@ export function SessionsListScreen() {
         {loading ? (
           <CardSkeletonList count={3} />
         ) : sessions.length === 0 ? (
-          <div className="mt-10 rounded-xl border border-dashed border-border p-6 text-center text-sm text-muted-foreground">
-            {t("sessions.empty")}
+          <div className="mt-8">
+            <EmptyCourt
+              title={t("sessions.emptyTitle")}
+              description={t("sessions.empty")}
+            />
           </div>
         ) : (
           <div className="flex flex-col gap-5">
@@ -253,7 +269,9 @@ function SessionCard({
         <CardContent className="pt-3">
           <div className="flex items-center justify-between gap-2">
             <div className="flex min-w-0 flex-1 flex-col items-start gap-0.5 py-1">
-              <span className="truncate font-semibold">{session.name}</span>
+              <span className="truncate font-display font-semibold tracking-tight">
+                {session.name}
+              </span>
               <span className="flex items-center gap-1 text-xs text-muted-foreground">
                 <CalendarClock size={12} /> {dateStr} · {session.courts}{" "}
                 {t("sessions.courtsSuffix")}

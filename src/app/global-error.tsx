@@ -36,7 +36,16 @@ export default function GlobalError({
           background: "#ffffff",
         }}
       >
-        <div style={{ fontSize: "3rem" }}>🏸</div>
+        {/* Pakai <img> biasa (bukan next/image) — root error boundary sengaja
+            tanpa dependency yang mungkin belum ter-load saat app crash. */}
+        {/* eslint-disable-next-line @next/next/no-img-element */}
+        <img
+          src="/shuttlecock.png"
+          alt=""
+          width={48}
+          height={48}
+          style={{ width: "3rem", height: "3rem", objectFit: "contain" }}
+        />
         <div>
           <h1 style={{ fontSize: "1.25rem", fontWeight: 700, margin: 0 }}>
             Aplikasi gagal dimuat

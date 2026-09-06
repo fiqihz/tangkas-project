@@ -1,6 +1,7 @@
 "use client";
 
 import { useMemo, useState } from "react";
+import Image from "next/image";
 import { Check, Search, Trash2, UserPlus } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
@@ -238,8 +239,16 @@ function RosterTab({
                     <div className="flex items-center gap-1.5 truncate font-medium">
                       {p.name} <GenderBadge gender={p.gender} />
                     </div>
-                    <div className="text-xs text-muted-foreground">
-                      🏸 {t("addPlayer.sessionsPlayed", { n: p.sessions_played })}
+                    <div className="flex items-center gap-1 text-xs text-muted-foreground">
+                      <Image
+                        src="/shuttlecock.png"
+                        alt=""
+                        aria-hidden
+                        width={12}
+                        height={12}
+                        className="h-3 w-3 shrink-0 object-contain"
+                      />
+                      {t("addPlayer.sessionsPlayed", { n: p.sessions_played })}
                     </div>
                   </div>
                 </div>
