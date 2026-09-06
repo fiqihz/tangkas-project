@@ -5,6 +5,7 @@
 // ============================================================================
 import type { Level, PlayerStatus } from "@/lib/domain/types";
 import type { ResolvedMatch } from "@/lib/domain/roster-stats";
+import { toTitleCase } from "@/lib/utils";
 import { getSupabase } from "./client";
 import { toMatch, toSessionPlayer } from "./mappers";
 import {
@@ -33,7 +34,9 @@ export async function listProfiles(
     .eq("community_id", communityId)
     .order("name");
   if (error) throw error;
-  return data ?? [];
+  // Title Case saat baca agar profil lama (tersimpan lowercase) tampil rapi
+  // tanpa migrasi data.
+  return (data ?? []).map((p) => ({ ...p, name: toTitleCase(p.name) }));
 }
 
 export async function createProfile(
@@ -44,7 +47,7 @@ export async function createProfile(
 ): Promise<DbPlayerProfile> {
   const { data, error } = await db()
     .from("player_profile")
-    .insert({ name, level, gender, community_id: communityId })
+    .insert({ name: toTitleCase(name), level, gender, community_id: communityId })
     .select("*")
     .single();
   if (error) throw error;
@@ -296,7 +299,7 @@ export async function addSessionPlayer(
     .insert({
       session_id: sessionId,
       profile_id: player.profileId ?? null,
-      name: player.name,
+      name: toTitleCase(player.name),
       level: player.level,
       gender: player.gender ?? null,
       status: player.status ?? "registered",

@@ -2,12 +2,15 @@
 // Konversi antara baris DB (snake_case) dan tipe domain (camelCase)
 // ============================================================================
 import type { Match, SessionPlayer } from "@/lib/domain/types";
+import { toTitleCase } from "@/lib/utils";
 import type { DbMatch, DbSessionPlayer } from "./types";
 
 export function toSessionPlayer(row: DbSessionPlayer): SessionPlayer {
   return {
     id: row.id,
-    name: row.name,
+    // Title Case saat baca juga, agar pemain lama (tersimpan lowercase sebelum
+    // fitur ini) tetap tampil rapi tanpa perlu migrasi data.
+    name: toTitleCase(row.name),
     level: row.level,
     gender: row.gender,
     status: row.status,

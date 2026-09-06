@@ -234,6 +234,20 @@ export function CourtsScreen() {
                         <ListOrdered size={16} /> {t("courts.firstMatch")}
                       </Button>
                     )}
+                    {/* Smart Matchmaking untuk lapangan KOSONG: buka pemilih mode
+                        lalu susun match langsung dari pool menunggu. Sama seperti
+                        di lapangan yang sedang jalan, hanya saja hasilnya mengisi
+                        lapangan ini (proposed -> siap Mulai Main), bukan preview
+                        match berikutnya. */}
+                    <Button
+                      variant="info"
+                      onClick={() => {
+                        haptic(12);
+                        setModeForCourt(court.id);
+                      }}
+                    >
+                      <Wand2 size={16} /> {t("courts.smartMatchmaking")}
+                    </Button>
                     <Button
                       variant="outline"
                       onClick={() => {
