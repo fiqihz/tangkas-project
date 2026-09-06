@@ -2,6 +2,7 @@ import type { Metadata, Viewport } from "next";
 import { Inter, Space_Grotesk } from "next/font/google";
 import "./globals.css";
 import { PwaRegister } from "@/components/pwa-register";
+import { Analytics } from "@vercel/analytics/react";
 
 // Inter = body/UI (kebacaan tinggi). Space Grotesk = display/headline (sporty
 // tapi clean). Di-expose sebagai CSS var agar dipakai lewat Tailwind fontFamily.
@@ -64,6 +65,7 @@ export default function RootLayout({
       >
         <PwaRegister />
         {children}
+        <Analytics />
       </body>
     </html>
   );
