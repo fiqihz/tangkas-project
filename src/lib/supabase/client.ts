@@ -30,7 +30,11 @@ export function getSupabase(): SupabaseClient {
   }
 
   client = createClient(url, key, {
-    auth: { persistSession: false },
+    auth: {
+      persistSession: true,
+      autoRefreshToken: true,
+      detectSessionInUrl: true,
+    },
     realtime: { params: { eventsPerSecond: 5 } },
   });
   return client;

@@ -15,6 +15,15 @@ import type {
 import * as repo from "@/lib/supabase/repo";
 import { toMatch, toSessionPlayer } from "@/lib/supabase/mappers";
 import type { DbCourt, DbSession } from "@/lib/supabase/types";
+import { useAuthStore } from "@/lib/store/auth-store";
+
+/**
+ * Baca community aktif dari auth-store (pola membaca store lain via getState()).
+ * Sumber kanonik konteks tenant = auth-store; tidak ada default DEFAULT_COMMUNITY_ID.
+ */
+function activeCommunityId(): string | null {
+  return useAuthStore.getState().activeCommunityId;
+}
 
 interface SessionState {
   loading: boolean;
@@ -243,9 +252,16 @@ export const useSessionStore = create<SessionState>((set, get) => ({
   },
 
   async loadSessions() {
+    // Tanpa community aktif tidak ada data yang bisa dimuat — tampilkan list kosong
+    // daripada memanggil repo dengan community null (operasi baca: aman early-return).
+    const communityId = activeCommunityId();
+    if (!communityId) {
+      set({ sessions: [], loading: false });
+      return;
+    }
     set({ loading: true, error: null });
     try {
-      const sessions = await repo.listSessions();
+      const sessions = await repo.listSessions(communityId);
       set({ sessions, loading: false });
     } catch (e) {
       set({ error: describe(e), loading: false });
@@ -341,10 +357,16 @@ export const useSessionStore = create<SessionState>((set, get) => ({
 
   async createSession(opts) {
     set({ error: null });
+    // Operasi tulis butuh community aktif — guard agar tidak dipanggil tanpa tenant.
+    const communityId = activeCommunityId();
+    if (!communityId) {
+      set({ error: "Belum ada community aktif. Pilih community dulu." });
+      return null;
+    }
     try {
       // Batasi hanya 1 ongoing dalam satu waktu.
       if ((opts.status ?? "ongoing") === "ongoing") {
-        const existing = await repo.getOngoingSession();
+        const existing = await repo.getOngoingSession(communityId);
         if (existing) {
           set({
             error:
@@ -359,6 +381,7 @@ export const useSessionStore = create<SessionState>((set, get) => ({
         status: opts.status ?? "ongoing",
         scheduledAt: opts.scheduledAt ?? null,
         courtLabels: opts.courtLabels,
+        communityId,
       });
       await get().loadSessions();
       if (opts.open) {
@@ -373,7 +396,12 @@ export const useSessionStore = create<SessionState>((set, get) => ({
 
   async startSession(sessionId) {
     // scheduled -> ongoing (batasi 1 ongoing)
-    const existing = await repo.getOngoingSession();
+    const communityId = activeCommunityId();
+    if (!communityId) {
+      set({ actionError: "Belum ada community aktif. Pilih community dulu." });
+      return;
+    }
+    const existing = await repo.getOngoingSession(communityId);
     if (existing && existing.id !== sessionId) {
       set({
         error:
@@ -392,7 +420,11 @@ export const useSessionStore = create<SessionState>((set, get) => ({
   async reactivateSession(sessionId) {
     // finished -> ongoing. Batasi 1 ongoing. Undo counter "ikut mabar" agar
     // tidak dobel saat nanti di-SELESAI-MABAR lagi.
-    const existing = await repo.getOngoingSession();
+    const communityId = activeCommunityId();
+    if (!communityId) {
+      return { ok: false, reason: "Belum ada community aktif." };
+    }
+    const existing = await repo.getOngoingSession(communityId);
     if (existing && existing.id !== sessionId) {
       return {
         ok: false,
@@ -475,12 +507,22 @@ export const useSessionStore = create<SessionState>((set, get) => ({
         // sudah terhubung ke profil -> update level-nya
         await repo.updateProfile(profileId, { level });
       } else if (player) {
-        // belum punya profil (pemain baru diinput manual) -> buat & tautkan
-        try {
-          const created = await repo.createProfile(player.name, level);
-          await repo.linkSessionPlayerProfile(playerId, created.id);
-        } catch {
-          // kalau nama sudah ada di roster, cukup abaikan pembuatan duplikat
+        // belum punya profil (pemain baru diinput manual) -> buat & tautkan.
+        // Sinkron roster hanya bila ada community aktif (tanda tangan baru
+        // createProfile butuh communityId; tanpa itu lewati sinkron ini).
+        const communityId = activeCommunityId();
+        if (communityId) {
+          try {
+            const created = await repo.createProfile(
+              player.name,
+              level,
+              player.gender ?? null,
+              communityId,
+            );
+            await repo.linkSessionPlayerProfile(playerId, created.id);
+          } catch {
+            // kalau nama sudah ada di roster, cukup abaikan pembuatan duplikat
+          }
         }
       }
 
@@ -500,11 +542,21 @@ export const useSessionStore = create<SessionState>((set, get) => ({
       if (profileId) {
         await repo.updateProfile(profileId, { gender });
       } else if (player) {
-        try {
-          const created = await repo.createProfile(player.name, player.level, gender);
-          await repo.linkSessionPlayerProfile(playerId, created.id);
-        } catch {
-          // abaikan bila nama sudah ada di roster
+        // Sinkron roster hanya bila ada community aktif (createProfile butuh
+        // communityId pada tanda tangan baru).
+        const communityId = activeCommunityId();
+        if (communityId) {
+          try {
+            const created = await repo.createProfile(
+              player.name,
+              player.level,
+              gender,
+              communityId,
+            );
+            await repo.linkSessionPlayerProfile(playerId, created.id);
+          } catch {
+            // abaikan bila nama sudah ada di roster
+          }
         }
       }
       await get().refresh();

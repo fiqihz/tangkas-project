@@ -9,12 +9,14 @@ import { toTitleCase } from "@/lib/utils";
 import { getSupabase } from "./client";
 import { toMatch, toSessionPlayer } from "./mappers";
 import {
-  DEFAULT_COMMUNITY_ID,
+  type DbCommunity,
   type DbCourt,
+  type DbInvite,
   type DbMatch,
   type DbPlayerProfile,
   type DbSession,
   type DbSessionPlayer,
+  type MembershipRole,
   type SessionStatus,
 } from "./types";
 
@@ -26,7 +28,7 @@ function db() {
 // ROSTER (player_profile) — persisten lintas mabar
 // ---------------------------------------------------------------------------
 export async function listProfiles(
-  communityId = DEFAULT_COMMUNITY_ID,
+  communityId: string,
 ): Promise<DbPlayerProfile[]> {
   const { data, error } = await db()
     .from("player_profile")
@@ -43,7 +45,7 @@ export async function createProfile(
   name: string,
   level: Level | null,
   gender: "male" | "female" | null = null,
-  communityId = DEFAULT_COMMUNITY_ID,
+  communityId: string,
 ): Promise<DbPlayerProfile> {
   const { data, error } = await db()
     .from("player_profile")
@@ -114,7 +116,7 @@ export async function decrementSessionsPlayed(
 // ---------------------------------------------------------------------------
 /** Semua sesi (terbaru dulu) untuk ditampilkan di list mabar. */
 export async function listSessions(
-  communityId = DEFAULT_COMMUNITY_ID,
+  communityId: string,
 ): Promise<DbSession[]> {
   const { data, error } = await db()
     .from("session")
@@ -127,7 +129,7 @@ export async function listSessions(
 
 /** Sesi yang sedang berjalan (maksimal 1). */
 export async function getOngoingSession(
-  communityId = DEFAULT_COMMUNITY_ID,
+  communityId: string,
 ): Promise<DbSession | null> {
   const { data, error } = await db()
     .from("session")
@@ -157,9 +159,9 @@ export async function createSession(opts: {
   status?: SessionStatus;
   scheduledAt?: string | null;
   courtLabels?: string[];
-  communityId?: string;
+  communityId: string;
 }): Promise<DbSession> {
-  const communityId = opts.communityId ?? DEFAULT_COMMUNITY_ID;
+  const communityId = opts.communityId;
   const { data, error } = await db()
     .from("session")
     .insert({
@@ -580,7 +582,7 @@ export function subscribeToSession(
  * dihitung oleh domain/roster-stats.
  */
 export async function listResolvedMatches(
-  communityId = DEFAULT_COMMUNITY_ID,
+  communityId: string,
 ): Promise<ResolvedMatch[]> {
   // 1. Semua sesi milik community.
   const sessions = await listSessions(communityId);
@@ -645,6 +647,222 @@ export async function submitFeedback(
   const { error } = await db()
     .from("feedback")
     .insert({ message: trimmed, contact: trimmedContact });
+  if (error) throw error;
+}
+
+// ---------------------------------------------------------------------------
+// AUTH / MULTI-TENANT (Fase 2) — membership, community, invite
+// ---------------------------------------------------------------------------
+// Semua tulisan ke `membership` diblok RLS dan hanya boleh lewat RPC
+// SECURITY DEFINER (owner-only). Baca membership/community dibatasi RLS ke
+// user login (membership_select). Delete community diizinkan langsung karena
+// design menyediakan policy community_delete owner-only.
+
+/** Ringkasan membership milik user login (untuk switcher & onboarding). */
+export interface Membership {
+  communityId: string;
+  communityName: string;
+  role: MembershipRole;
+}
+
+/** Baris member sebuah community (untuk dialog kelola admin). */
+export interface MemberRow {
+  userId: string;
+  role: MembershipRole;
+  createdAt: string;
+  /**
+   * Email member. Diisi hanya oleh `listCommunityMembersWithEmail` (RPC owner-
+   * only). `listCommunityMembers` lama tidak mengambil email → bernilai null.
+   */
+  email: string | null;
+}
+
+/**
+ * Ambil membership milik user login, join ke `community` agar mendapat nama
+ * community. RLS `membership_select` sudah membatasi baris ke user login,
+ * namun kita tetap filter eksplisit `user_id = auth.uid()` untuk kejelasan
+ * dan agar aman bila kebijakan berubah. *Req 4, 8.1.*
+ */
+export async function listMyMemberships(): Promise<Membership[]> {
+  const {
+    data: { user },
+    error: userErr,
+  } = await db().auth.getUser();
+  if (userErr) throw userErr;
+  if (!user) return [];
+
+  const { data, error } = await db()
+    .from("membership")
+    .select("community_id, role, community:community_id (id, name)")
+    .eq("user_id", user.id)
+    .order("created_at");
+  if (error) throw error;
+
+  return (data ?? []).map((row) => {
+    // Supabase mengembalikan relasi embedded sebagai objek (atau array).
+    const community = Array.isArray(row.community)
+      ? row.community[0]
+      : row.community;
+    return {
+      communityId: row.community_id as string,
+      communityName: (community?.name as string) ?? "",
+      role: row.role as MembershipRole,
+    };
+  });
+}
+
+/**
+ * Buat community baru + membership owner untuk user login, sekaligus mengklaim
+ * data lama, secara atomik di DB. Memanggil RPC `create_community_with_owner`
+ * (SECURITY DEFINER; dibuat pada migration 015). *Req 3.3, 10.*
+ */
+export async function createCommunityWithOwner(
+  name: string,
+): Promise<DbCommunity> {
+  const { data, error } = await db().rpc("create_community_with_owner", {
+    p_name: name.trim(),
+  });
+  if (error) throw error;
+  return data as DbCommunity;
+}
+
+/**
+ * Buat undangan admin ke sebuah community. Role dipaksa 'admin' (Fase 2 hanya
+ * mengizinkan admin; RLS `invite_insert` + CHECK juga menjamin ini). Token
+ * WAJIB di-set karena kolom `token` tidak punya default (migration 012); kita
+ * bangkitkan token acak yang sulit ditebak di client. Insert dijaga owner-only
+ * oleh RLS. *Req 6.2, 6.10.*
+ */
+export async function createInvite(
+  communityId: string,
+  email: string,
+): Promise<DbInvite> {
+  const { data, error } = await db()
+    .from("invite")
+    .insert({
+      community_id: communityId,
+      email: email.trim().toLowerCase(),
+      role: "admin",
+      token: generateInviteToken(),
+    })
+    .select("*")
+    .single();
+  if (error) throw error;
+  return data;
+}
+
+/**
+ * Bangkitkan token invite acak (sulit ditebak & praktis unik). Menggabungkan
+ * dua UUID acak dari CSPRNG (`crypto.randomUUID`). Tabel `invite.token` juga
+ * ber-unique constraint sebagai jaring pengaman terakhir.
+ */
+function generateInviteToken(): string {
+  return `${crypto.randomUUID()}${crypto.randomUUID()}`.replace(/-/g, "");
+}
+
+/**
+ * Tukar token invite menjadi membership admin. Memanggil RPC `redeem_invite`
+ * (SECURITY DEFINER; dibuat pada migration 015) yang mengembalikan jsonb
+ * `{ ok, reason?, community_id? }`. Saat sukses, `community_id` diteruskan
+ * sebagai `communityId` agar pemanggil dapat langsung auto-switch ke komunitas
+ * hasil undangan. *Req 6.5–6.8.*
+ */
+export async function redeemInvite(
+  token: string,
+): Promise<{ ok: boolean; reason?: string; communityId?: string }> {
+  const { data, error } = await db().rpc("redeem_invite", { p_token: token });
+  if (error) throw error;
+  const result = (data ?? {}) as {
+    ok?: boolean;
+    reason?: string;
+    community_id?: string;
+  };
+  return {
+    ok: Boolean(result.ok),
+    reason: result.reason,
+    communityId: result.community_id ?? undefined,
+  };
+}
+
+/**
+ * Daftar member sebuah community (RLS membatasi ke anggota community tsb).
+ * *Req 5.3.*
+ */
+export async function listCommunityMembers(
+  communityId: string,
+): Promise<MemberRow[]> {
+  const { data, error } = await db()
+    .from("membership")
+    .select("user_id, role, created_at")
+    .eq("community_id", communityId)
+    .order("created_at");
+  if (error) throw error;
+  return (data ?? []).map((row) => ({
+    userId: row.user_id as string,
+    role: row.role as MembershipRole,
+    createdAt: row.created_at as string,
+    email: null,
+  }));
+}
+
+/**
+ * Daftar member sebuah community LENGKAP dengan email (owner-only). Memanggil
+ * RPC `list_community_members_with_email` (SECURITY DEFINER; dibuat pada
+ * migration 016) yang membaca `auth.users` dan menjaga guard owner-only.
+ * Dipakai dialog kelola admin agar owner bisa mengenali member dari email.
+ * *Req 5.3.*
+ */
+export async function listCommunityMembersWithEmail(
+  communityId: string,
+): Promise<MemberRow[]> {
+  const { data, error } = await db().rpc("list_community_members_with_email", {
+    p_community_id: communityId,
+  });
+  if (error) throw error;
+  return ((data ?? []) as Array<{
+    user_id: string;
+    role: MembershipRole;
+    email: string | null;
+    created_at: string;
+  }>).map((row) => ({
+    userId: row.user_id,
+    role: row.role,
+    createdAt: row.created_at,
+    email: row.email,
+  }));
+}
+
+/**
+ * Keluarkan seorang member dari community. Penulisan langsung ke `membership`
+ * diblok RLS (tulis membership hanya lewat RPC SECURITY DEFINER owner-only),
+ * jadi kita panggil RPC `kick_member`.
+ *
+ * TODO(migration RPC): RPC `kick_member(p_community_id uuid, p_user_id uuid)`
+ * perlu didefinisikan pada migration RPC (SECURITY DEFINER, owner-only) — Task 3
+ * belum tentu membuatnya. Konsisten dengan design: tulis membership lewat RPC.
+ * *Req 5.3, 5.4.*
+ */
+export async function kickMember(
+  communityId: string,
+  userId: string,
+): Promise<void> {
+  const { error } = await db().rpc("kick_member", {
+    p_community_id: communityId,
+    p_user_id: userId,
+  });
+  if (error) throw error;
+}
+
+/**
+ * Hapus community (beserta data turunannya via ON DELETE CASCADE). Delete
+ * langsung diizinkan karena design menyediakan policy `community_delete`
+ * owner-only pada tabel community. *Req 5.1, 5.2.*
+ */
+export async function deleteCommunity(communityId: string): Promise<void> {
+  const { error } = await db()
+    .from("community")
+    .delete()
+    .eq("id", communityId);
   if (error) throw error;
 }
 

@@ -607,6 +607,64 @@ export const DICT = {
     id: "Fitur ini sedang kami siapkan: pemilik komunitas akan bisa mengundang host lain sebagai admin lewat email.",
     en: "We're building this: a community owner will be able to invite other hosts as admins via email.",
   },
+
+  // ==========================================================================
+  // AUTH & MULTI-TENANT (Phase 2)
+  // ==========================================================================
+  // Auth — login/register
+  "auth.login": { id: "Masuk", en: "Sign in" },
+  "auth.register": { id: "Daftar", en: "Sign up" },
+  "auth.email": { id: "Email", en: "Email" },
+  "auth.password": { id: "Kata sandi", en: "Password" },
+  "auth.loginGoogle": { id: "Masuk dengan Google", en: "Sign in with Google" },
+  "auth.registerGoogle": { id: "Daftar dengan Google", en: "Sign up with Google" },
+  "auth.toRegister": { id: "Belum punya akun? Daftar", en: "No account? Sign up" },
+  "auth.toLogin": { id: "Sudah punya akun? Masuk", en: "Have an account? Sign in" },
+  "auth.invalidCredentials": { id: "Email atau kata sandi salah.", en: "Invalid email or password." },
+  "auth.genericError": { id: "Terjadi kesalahan. Coba lagi.", en: "Something went wrong. Please try again." },
+  "auth.rateLimited": { id: "Terlalu banyak percobaan. Tunggu sebentar lalu coba lagi.", en: "Too many attempts. Please wait a moment and try again." },
+  "auth.signOut": { id: "Keluar", en: "Sign out" },
+  "auth.signingIn": { id: "Memproses…", en: "Signing in…" },
+
+  // Onboarding
+  "onboarding.title": { id: "Buat komunitas pertamamu", en: "Create your first community" },
+  "onboarding.communityName": { id: "Nama komunitas", en: "Community name" },
+  "onboarding.namePlaceholder": { id: "mis. Mabar Jumat Malam", en: "e.g. Friday Night Badminton" },
+  "onboarding.create": { id: "Buat komunitas", en: "Create community" },
+  "onboarding.creating": { id: "Membuat…", en: "Creating…" },
+
+  // Community switcher
+  "community.switch": { id: "Ganti komunitas", en: "Switch community" },
+  "community.active": { id: "Komunitas aktif", en: "Active community" },
+
+  // Kelola admin
+  "admin.manage": { id: "Kelola admin", en: "Manage admins" },
+  "admin.inviteEmail": { id: "Email admin yang diundang", en: "Invited admin email" },
+  "admin.sendInvite": { id: "Kirim undangan", en: "Send invite" },
+  "admin.generateLink": { id: "Buat link", en: "Generate link" },
+  "admin.inviteEmailBoundHint": { id: "Link hanya bisa dipakai oleh email ini.", en: "The link only works for this email." },
+  "admin.inviteSent": { id: "Undangan terkirim.", en: "Invite sent." },
+  "admin.inviteLink": { id: "Link undangan (bagikan manual)", en: "Invite link (share manually)" },
+  "admin.copyLink": { id: "Salin link", en: "Copy link" },
+  "admin.linkCopied": { id: "Link tersalin.", en: "Link copied." },
+  "admin.inviteLinkHint": { id: "Bagikan link ini ke calon admin (mis. lewat WhatsApp). Email undangan juga terkirim otomatis bila domain sudah diverifikasi.", en: "Share this link with the prospective admin (e.g. via WhatsApp). An invite email is also sent automatically once your domain is verified." },
+  "admin.members": { id: "Anggota", en: "Members" },
+  "admin.kick": { id: "Keluarkan", en: "Remove" },
+  "admin.ownerBadge": { id: "Pemilik", en: "Owner" },
+  "admin.adminBadge": { id: "Admin", en: "Admin" },
+  "admin.deleteCommunity": { id: "Hapus komunitas", en: "Delete community" },
+  "admin.deleteConfirm": { id: "Hapus komunitas ini beserta semua datanya?", en: "Delete this community and all its data?" },
+
+  // Invite (redeem)
+  "invite.expired": { id: "Undangan sudah kedaluwarsa.", en: "This invite has expired." },
+  "invite.used": { id: "Undangan sudah dipakai.", en: "This invite has already been used." },
+  "invite.invalid": { id: "Undangan tidak valid.", en: "Invalid invite." },
+  "invite.accepted": { id: "Kamu kini admin komunitas ini.", en: "You are now an admin of this community." },
+  "invite.emailMismatch": { id: "Undangan ini ditujukan untuk email lain. Masuk dengan email yang diundang.", en: "This invite is for a different email. Sign in with the invited email." },
+  "invite.accepting": { id: "Memproses undangan…", en: "Processing invite…" },
+  "invite.acceptedGoApp": { id: "Undangan diterima. Membuka aplikasi…", en: "Invite accepted. Opening app…" },
+  "invite.title": { id: "Terima undangan", en: "Accept invite" },
+  "invite.needLogin": { id: "Masuk atau daftar untuk menerima undangan.", en: "Sign in or sign up to accept the invite." },
 } as const;
 
 export type DictKey = keyof typeof DICT;

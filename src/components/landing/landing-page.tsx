@@ -25,7 +25,8 @@ import { FlowSteps, type FlowStep } from "./flow-steps";
 import { FaqAccordion, type FaqItem } from "./faq-accordion";
 import type { DictKey } from "@/lib/i18n/dict";
 
-const APP_HREF = "/app";
+const LOGIN_HREF = "/login";
+const REGISTER_HREF = "/register";
 
 export function LandingPage() {
   const t = useT();
@@ -108,8 +109,13 @@ export function LandingPage() {
               <Languages size={14} />
               {t("landing.langToggle")}
             </button>
-            <Link href={APP_HREF}>
-              <Button size="sm">{t("landing.nav.openApp")}</Button>
+            <Link href={LOGIN_HREF}>
+              <Button variant="ghost" size="sm">
+                {t("auth.login")}
+              </Button>
+            </Link>
+            <Link href={REGISTER_HREF}>
+              <Button size="sm">{t("auth.register")}</Button>
             </Link>
           </div>
         </div>
@@ -137,7 +143,7 @@ export function LandingPage() {
                 {t("landing.hero.subtitle")}
               </p>
               <div className="mt-8 flex flex-col items-stretch justify-center gap-3 sm:flex-row md:justify-start">
-                <Link href={APP_HREF}>
+                <Link href={REGISTER_HREF}>
                   <Button size="lg" className="w-full sm:w-auto">
                     {t("landing.hero.ctaPrimary")}
                   </Button>
@@ -296,11 +302,16 @@ export function LandingPage() {
           <p className="max-w-md text-sm leading-relaxed text-muted-foreground">
             {t("landing.footer.tagline")}
           </p>
-          <Link href={APP_HREF}>
-            <Button variant="outline" size="sm">
-              {t("landing.footer.openApp")}
-            </Button>
-          </Link>
+          <div className="flex items-center gap-2">
+            <Link href={LOGIN_HREF}>
+              <Button variant="outline" size="sm">
+                {t("auth.login")}
+              </Button>
+            </Link>
+            <Link href={REGISTER_HREF}>
+              <Button size="sm">{t("auth.register")}</Button>
+            </Link>
+          </div>
           <p className="mt-2 text-xs text-muted-foreground">
             © {new Date().getFullYear()} TangkasBoard · {t("landing.footer.rights")}
           </p>
