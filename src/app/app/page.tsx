@@ -1,12 +1,12 @@
 "use client";
 
 import { AppShell } from "@/components/app-shell";
-import { PasswordGate } from "@/components/password-gate";
+import { RouteGuard } from "@/components/auth/route-guard";
 
 export default function AppPage() {
   return (
-    <PasswordGate>
+    <RouteGuard>
       <AppShell />
-    </PasswordGate>
+    </RouteGuard>
   );
 }

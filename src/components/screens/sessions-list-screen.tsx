@@ -2,7 +2,7 @@
 
 import { useMemo, useState } from "react";
 import { motion } from "framer-motion";
-import { Plus, Play, RotateCcw, Trash2, CalendarClock, Eye, BarChart3 } from "lucide-react";
+import { Plus, Play, RotateCcw, Trash2, CalendarClock, Eye, BarChart3, Settings, ChevronLeft } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent } from "@/components/ui/card";
 import { Fab } from "@/components/ui/fab";
@@ -16,6 +16,8 @@ import { cn } from "@/lib/utils";
 import type { DbSession, SessionStatus } from "@/lib/supabase/types";
 import { CreateSessionDialog } from "@/components/dialogs/create-session-dialog";
 import { RosterScreen } from "@/components/screens/roster-screen";
+import { SettingsScreen } from "@/components/screens/settings-screen";
+import { CommunitySwitcher } from "@/components/app/community-switcher";
 
 const STATUS_META: Record<
   SessionStatus,
@@ -40,6 +42,7 @@ export function SessionsListScreen() {
   const [msg, setMsg] = useState<string | null>(null);
   const [deleteTarget, setDeleteTarget] = useState<DbSession | null>(null);
   const [showRoster, setShowRoster] = useState(false);
+  const [showSettings, setShowSettings] = useState(false);
 
   const grouped = useMemo(() => {
     const g: Record<SessionStatus, DbSession[]> = {
@@ -55,25 +58,69 @@ export function SessionsListScreen() {
     return <RosterScreen onClose={() => setShowRoster(false)} />;
   }
 
+  if (showSettings) {
+    return (
+      <div className="mx-auto flex h-dvh max-w-md flex-col overflow-hidden">
+        <header className="flex items-center gap-2 border-b border-border px-3 py-3 pt-[calc(env(safe-area-inset-top)+0.75rem)]">
+          <button
+            onClick={() => {
+              haptic(8);
+              setShowSettings(false);
+            }}
+            className="flex h-9 w-9 items-center justify-center rounded-lg active:scale-90 active:bg-secondary"
+            aria-label={t("header.backToList")}
+          >
+            <ChevronLeft size={22} />
+          </button>
+          <div className="font-bold leading-tight">{t("settings.title")}</div>
+        </header>
+        <main className="flex-1 overflow-y-auto p-4 pb-28">
+          <SettingsScreen />
+        </main>
+      </div>
+    );
+  }
+
   return (
     <div className="mx-auto flex h-dvh max-w-md flex-col overflow-hidden">
-      <header className="flex items-center justify-between gap-2 border-b border-border px-4 py-3 pt-[calc(env(safe-area-inset-top)+0.75rem)]">
-        <div className="flex items-center gap-2">
-          <span className="text-xl">🏸</span>
-          <div>
-            <div className="font-bold leading-tight">TangkasBoard</div>
-            <div className="text-xs text-muted-foreground">{t("sessions.subtitle")}</div>
+      <header className="flex flex-col gap-2 border-b border-border px-4 py-3 pt-[calc(env(safe-area-inset-top)+0.75rem)]">
+        <div className="flex items-center justify-between gap-2">
+          <div className="flex min-w-0 items-center gap-2">
+            <span className="text-xl">🏸</span>
+            <div className="min-w-0">
+              <div className="truncate font-bold leading-tight">TangkasBoard</div>
+              <div className="truncate text-xs text-muted-foreground">
+                {t("sessions.subtitle")}
+              </div>
+            </div>
+          </div>
+          <div className="flex shrink-0 items-center gap-2">
+            <button
+              onClick={() => {
+                haptic(8);
+                setShowRoster(true);
+              }}
+              className="flex h-10 w-10 items-center justify-center rounded-lg border border-border active:scale-95 active:bg-secondary"
+              aria-label={t("sessions.roster")}
+            >
+              <BarChart3 size={18} />
+            </button>
+            <button
+              onClick={() => {
+                haptic(8);
+                setShowSettings(true);
+              }}
+              className="flex h-10 w-10 items-center justify-center rounded-lg border border-border active:scale-95 active:bg-secondary"
+              aria-label={t("settings.open")}
+            >
+              <Settings size={18} />
+            </button>
           </div>
         </div>
-        <button
-          onClick={() => {
-            haptic(8);
-            setShowRoster(true);
-          }}
-          className="flex items-center gap-1.5 rounded-lg border border-border px-3 py-2 text-sm font-medium active:scale-95 active:bg-secondary"
-        >
-          <BarChart3 size={16} /> {t("sessions.roster")}
-        </button>
+        {/* Community switcher pindah ke baris kedua (full width, mudah di-tap).
+            Komponen ini me-render null bila user hanya punya <=1 komunitas,
+            sehingga baris kedua otomatis hilang untuk single-community. */}
+        <CommunitySwitcher className="w-full max-w-none justify-between" />
       </header>
 
       <main className="flex-1 overflow-y-auto p-4 pb-28">

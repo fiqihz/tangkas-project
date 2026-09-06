@@ -1,8 +1,12 @@
 "use client";
 
-import { Moon, Sun, Languages } from "lucide-react";
+import { Moon, Sun, Languages, LogOut } from "lucide-react";
+import { useRouter } from "next/navigation";
+import { Button } from "@/components/ui/button";
 import { Card, CardContent } from "@/components/ui/card";
+import { ManageAdminsButton } from "@/components/app/manage-admins-dialog";
 import { useSettingsStore } from "@/lib/store/settings-store";
+import { useAuthStore } from "@/lib/store/auth-store";
 import { haptic } from "@/lib/haptics";
 import { cn } from "@/lib/utils";
 import type { Lang } from "@/lib/i18n/dict";
@@ -13,8 +17,18 @@ export function SettingsScreen() {
   const setTheme = useSettingsStore((s) => s.setTheme);
   const setLang = useSettingsStore((s) => s.setLang);
   const t = useSettingsStore((s) => s.t);
+  const signOut = useAuthStore((s) => s.signOut);
+  const router = useRouter();
 
   const isDark = theme === "dark";
+
+  const onSignOut = async () => {
+    haptic(8);
+    await signOut();
+    // signOut men-set status "signedOut" (RouteGuard di /app akan redirect),
+    // tapi navigasikan eksplisit agar transisi ke /login pasti terjadi.
+    router.replace("/login");
+  };
 
   return (
     <div className="flex flex-col gap-5">
@@ -91,6 +105,20 @@ export function SettingsScreen() {
           </CardContent>
         </Card>
       </div>
+
+      {/* Kelola admin (hanya tampil untuk owner community aktif) */}
+      <ManageAdminsButton />
+
+      {/* Logout */}
+      <Button
+        type="button"
+        variant="outline"
+        className="w-full justify-start"
+        onClick={onSignOut}
+      >
+        <LogOut size={18} />
+        {t("auth.signOut")}
+      </Button>
     </div>
   );
 }

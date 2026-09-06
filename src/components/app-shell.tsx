@@ -23,6 +23,7 @@ import { buildLeaderboard } from "@/lib/domain/leaderboard";
 import { ScreenTransition } from "@/components/ui/motion";
 import { Toast } from "@/components/ui/toast";
 import { SessionsListScreen } from "@/components/screens/sessions-list-screen";
+import { CommunitySwitcher } from "@/components/app/community-switcher";
 import { PlayersScreen } from "@/components/screens/players-screen";
 import { CourtsScreen } from "@/components/screens/courts-screen";
 import { LeaderboardScreen } from "@/components/screens/leaderboard-screen";
@@ -144,6 +145,7 @@ function AppShellContent() {
                 : `${t("header.roundCourts")} ${session.current_round} · ${session.courts} ${t("header.courts")}`}
             </div>
           </div>
+          <CommunitySwitcher />
           <button
             onClick={() => {
               haptic(8);

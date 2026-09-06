@@ -81,5 +81,34 @@ export interface DbMatch {
   finished_at: string | null;
 }
 
+// ============================================================================
+// Membership & Invite (Fase 2: Auth + Multi-Tenant) — selaras dengan
+// supabase/migrations/012_membership_invite.sql
+// ============================================================================
+
+export type MembershipRole = "owner" | "admin" | "member";
+
+export type InviteStatus = "pending" | "accepted" | "expired" | "revoked";
+
+export interface DbMembership {
+  id: string;
+  user_id: string;
+  community_id: string;
+  role: MembershipRole;
+  created_at: string;
+}
+
+export interface DbInvite {
+  id: string;
+  community_id: string;
+  email: string;
+  role: MembershipRole;
+  token: string;
+  status: InviteStatus;
+  expires_at: string;
+  invited_by: string | null;
+  created_at: string;
+}
+
 /** ID komunitas default untuk Opsi B (single-tenant). */
 export const DEFAULT_COMMUNITY_ID = "00000000-0000-0000-0000-000000000001";
