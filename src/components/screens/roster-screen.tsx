@@ -29,15 +29,15 @@ export function RosterScreen({ onClose }: { onClose: () => void }) {
     [profiles],
   );
 
-  // Urutkan: paling banyak main dulu, lalu nama.
+  // Urutkan: paling banyak ikut mabar dulu, lalu nama.
   const sorted = useMemo(() => {
     const q = query.trim().toLowerCase();
     const list = q
       ? profiles.filter((p) => p.name.toLowerCase().includes(q))
       : profiles;
     return [...list].sort((a, b) => {
-      const ga = statsById.get(a.id)?.games ?? 0;
-      const gb = statsById.get(b.id)?.games ?? 0;
+      const ga = statsById.get(a.id)?.sessions ?? 0;
+      const gb = statsById.get(b.id)?.sessions ?? 0;
       if (ga !== gb) return gb - ga;
       return a.name.localeCompare(b.name);
     });
@@ -116,9 +116,9 @@ export function RosterScreen({ onClose }: { onClose: () => void }) {
                       {s && s.games > 0 ? (
                         <>
                           <span className="font-medium text-foreground">
-                            {s.games}
+                            {s.sessions}
                           </span>{" "}
-                          main · {s.winRate}% WR
+                          mabar · {s.winRate}% WR
                         </>
                       ) : (
                         "belum main"
