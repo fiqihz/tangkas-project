@@ -328,6 +328,7 @@ export async function updateSessionPlayer(
   patch: Partial<
     Pick<
       DbSessionPlayer,
+      | "name"
       | "level"
       | "gender"
       | "status"

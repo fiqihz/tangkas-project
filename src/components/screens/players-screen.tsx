@@ -2,12 +2,15 @@
 
 import { useMemo, useState } from "react";
 import {
+  Check,
   ChevronDown,
   Coffee,
   LogIn,
+  Pencil,
   Play,
   Plus,
   Search,
+  X,
 } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent } from "@/components/ui/card";
@@ -46,8 +49,15 @@ type QueueInfo =
   | { kind: "waiting"; position: number; etaMinutes: number };
 
 export function PlayersScreen() {
-  const { players, matches, courts, setPlayerLevel, setPlayerStatus, setPlayerGender } =
-    useSessionStore();
+  const {
+    players,
+    matches,
+    courts,
+    setPlayerLevel,
+    setPlayerStatus,
+    setPlayerGender,
+    setPlayerName,
+  } = useSessionStore();
   const t = useT();
   const [expanded, setExpanded] = useState<string | null>(null);
   const [adding, setAdding] = useState(false);
@@ -201,6 +211,7 @@ export function PlayersScreen() {
                         onSetLevel={(lv) => setPlayerLevel(p.id, lv)}
                         onSetGender={(g) => setPlayerGender(p.id, g)}
                         onSetStatus={(s) => setPlayerStatus(p.id, s)}
+                        onSetName={(name) => setPlayerName(p.id, name)}
                       />
                     ),
                   )}
@@ -235,6 +246,7 @@ function PlayerRow({
   onSetLevel,
   onSetGender,
   onSetStatus,
+  onSetName,
 }: {
   player: SessionPlayer;
   queue?: QueueInfo;
@@ -243,8 +255,27 @@ function PlayerRow({
   onSetLevel: (lv: Level) => void;
   onSetGender: (g: Gender) => void;
   onSetStatus: (s: PlayerStatus) => void;
+  onSetName: (name: string) => void;
 }) {
   const t = useT();
+  // State edit nama: null = tidak sedang edit, string = draft nama.
+  const [nameDraft, setNameDraft] = useState<string | null>(null);
+
+  const startEdit = () => {
+    haptic(6);
+    setNameDraft(player.name);
+  };
+  const cancelEdit = () => setNameDraft(null);
+  const saveName = () => {
+    if (nameDraft === null) return;
+    const trimmed = nameDraft.trim();
+    // Simpan hanya bila ada isi & benar-benar berubah (case-insensitive).
+    if (trimmed && trimmed.toLowerCase() !== player.name.toLowerCase()) {
+      haptic(15);
+      onSetName(trimmed);
+    }
+    setNameDraft(null);
+  };
   return (
     <Card>
       <CardContent className="pt-3">
@@ -270,6 +301,51 @@ function PlayerRow({
 
         {expanded && (
           <div className="mt-3 flex flex-col gap-3 border-t border-border pt-3">
+            <div>
+              <div className="mb-1 text-xs text-muted-foreground">
+                {t("players.editName")}
+              </div>
+              {nameDraft === null ? (
+                <Button
+                  size="sm"
+                  variant="outline"
+                  onClick={startEdit}
+                  className="w-full justify-start"
+                >
+                  <Pencil size={14} /> {player.name}
+                </Button>
+              ) : (
+                <div className="flex items-center gap-2">
+                  <Input
+                    value={nameDraft}
+                    onChange={(e) => setNameDraft(e.target.value)}
+                    onKeyDown={(e) => {
+                      if (e.key === "Enter") saveName();
+                      if (e.key === "Escape") cancelEdit();
+                    }}
+                    placeholder={t("players.namePlaceholder")}
+                    autoFocus
+                    className="h-9"
+                  />
+                  <Button
+                    size="sm"
+                    onClick={saveName}
+                    disabled={nameDraft.trim().length === 0}
+                    className="shrink-0"
+                  >
+                    <Check size={14} /> {t("common.save")}
+                  </Button>
+                  <Button
+                    size="sm"
+                    variant="outline"
+                    onClick={cancelEdit}
+                    className="shrink-0"
+                  >
+                    <X size={14} />
+                  </Button>
+                </div>
+              )}
+            </div>
             <div>
               <div className="mb-1 text-xs text-muted-foreground">
                 {t("players.setLevel")}

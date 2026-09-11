@@ -94,6 +94,8 @@ export const DICT = {
   "players.addFab": { id: "Pemain", en: "Player" },
   "players.setLevel": { id: "Set level", en: "Set level" },
   "players.setGender": { id: "Set gender", en: "Set gender" },
+  "players.editName": { id: "Edit nama", en: "Edit name" },
+  "players.namePlaceholder": { id: "Nama pemain", en: "Player name" },
   "players.notSet": { id: "(belum di-set)", en: "(not set)" },
   "players.emptyTitle": { id: "Lapangan masih sepi", en: "The court is empty" },
   "players.empty": {

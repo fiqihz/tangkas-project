@@ -16,6 +16,7 @@ import * as repo from "@/lib/supabase/repo";
 import { toMatch, toSessionPlayer } from "@/lib/supabase/mappers";
 import type { DbCourt, DbSession } from "@/lib/supabase/types";
 import { useAuthStore } from "@/lib/store/auth-store";
+import { toTitleCase } from "@/lib/utils";
 
 /**
  * Baca community aktif dari auth-store (pola membaca store lain via getState()).
@@ -76,6 +77,7 @@ interface SessionState {
   }) => Promise<void>;
   setPlayerLevel: (playerId: string, level: Level) => Promise<void>;
   setPlayerStatus: (playerId: string, status: PlayerStatus) => Promise<void>;
+  setPlayerName: (playerId: string, name: string) => Promise<void>;
 
   // courts
   addCourt: () => Promise<void>;
@@ -562,6 +564,27 @@ export const useSessionStore = create<SessionState>((set, get) => ({
       await get().refresh();
     } catch (e) {
       set({ actionError: `Gagal menyimpan gender pemain: ${describe(e)}.` });
+    }
+  },
+
+  async setPlayerName(playerId, name) {
+    const { profileIdOf } = get();
+    // Normalisasi sekali di sini agar tulisan nama konsisten di session_player
+    // maupun player_profile (repo menerapkan toTitleCase juga saat create).
+    const clean = toTitleCase(name);
+    if (!clean) return; // nama kosong tidak disimpan
+    try {
+      await repo.updateSessionPlayer(playerId, { name: clean });
+
+      // Sinkron ke roster agar rename persisten lintas mabar (bila terhubung).
+      const profileId = profileIdOf[playerId] ?? null;
+      if (profileId) {
+        await repo.updateProfile(profileId, { name: clean });
+      }
+
+      await get().refresh();
+    } catch (e) {
+      set({ actionError: `Gagal menyimpan nama pemain: ${describe(e)}.` });
     }
   },
 
