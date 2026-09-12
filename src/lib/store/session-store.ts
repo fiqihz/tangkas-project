@@ -986,8 +986,25 @@ export const useSessionStore = create<SessionState>((set, get) => ({
     // sekadar belum di-set level. Pemain reserve tidak dicabut dari match
     // berjalan, hanya di-booking sampai match asalnya selesai.
     if (pool.length < 4 && waitingNoLevel === 0) {
+      // Pemain yang sudah di preview (proposed) lapangan lain TIDAK boleh
+      // di-reserve lagi — mereka sudah di-booking di sana (dobel-booking).
+      // CATATAN: jangan pakai `busy` (proposed+playing) sebagai exclude, karena
+      // kandidat reserve memang pemain PLAYING (mereka semua ada di busy).
+      // Yang harus dikecualikan hanya yang sudah di PROPOSED. Proposed lapangan
+      // ini sendiri sudah dihapus di atas, jadi tidak ikut terhitung.
+      const inProposedReserve = new Set<string>();
+      for (const m of matches) {
+        if (m.state === "proposed") {
+          [...m.teamA.playerIds, ...m.teamB.playerIds].forEach((id) =>
+            inProposedReserve.add(id),
+          );
+        }
+      }
       const reserved = reservablePlayingPlayers(matches, players).filter(
-        (p) => p.level !== null && !waitingIds.has(p.id),
+        (p) =>
+          p.level !== null &&
+          !waitingIds.has(p.id) &&
+          !inProposedReserve.has(p.id),
       );
       const need = 4 - pool.length;
       // Best-effort level balance: dari kandidat reserve (sudah terurut durasi
