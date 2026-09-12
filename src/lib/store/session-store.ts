@@ -797,9 +797,22 @@ export const useSessionStore = create<SessionState>((set, get) => ({
 
   reservableCandidates() {
     const { matches, players } = get();
-    // Sedang main, active, sudah ber-level, terurut durasi terlama dulu.
+    // Pemain yang SUDAH dialokasikan ke preview (proposed) lapangan mana pun
+    // TIDAK boleh dipinjam lagi — mereka sudah di-booking untuk match
+    // berikutnya di sana. Meminjam mereka = dobel-booking (bug: pemain preview
+    // Lap 1 muncul lagi sebagai kandidat pinjam saat menyusun Lap 2).
+    const inProposed = new Set<string>();
+    for (const m of matches) {
+      if (m.state === "proposed") {
+        [...m.teamA.playerIds, ...m.teamB.playerIds].forEach((id) =>
+          inProposed.add(id),
+        );
+      }
+    }
+    // Sedang main, active, ber-level, belum di preview mana pun.
+    // Terurut durasi terlama dulu.
     return reservablePlayingPlayers(matches, players).filter(
-      (p) => p.level !== null,
+      (p) => p.level !== null && !inProposed.has(p.id),
     );
   },
 
@@ -936,12 +949,25 @@ export const useSessionStore = create<SessionState>((set, get) => ({
     // (ladies/mixed/gendongan/kelas) tetap terbentuk meski pemain yang cocok
     // sedang main di lapangan lain.
     if (allowReserveIds && allowReserveIds.size > 0) {
+      // Jaring pengaman: JANGAN pinjam pemain yang sudah ada di preview
+      // (proposed) lapangan lain — mereka sudah di-booking di sana. Meminjam
+      // mereka = dobel-booking. (Proposed lapangan ini sendiri sudah dihapus
+      // di atas, jadi tidak ikut terhitung.)
+      const inOtherProposed = new Set<string>();
+      for (const m of matches) {
+        if (m.state === "proposed") {
+          [...m.teamA.playerIds, ...m.teamB.playerIds].forEach((id) =>
+            inOtherProposed.add(id),
+          );
+        }
+      }
       const borrowed = players.filter(
         (p) =>
           allowReserveIds.has(p.id) &&
           p.status === "active" &&
           p.level !== null &&
-          !waitingIds.has(p.id),
+          !waitingIds.has(p.id) &&
+          !inOtherProposed.has(p.id),
       );
       if (borrowed.length > 0) pool = [...pool, ...borrowed];
     }
