@@ -96,6 +96,8 @@ export const DICT = {
   "players.setGender": { id: "Set gender", en: "Set gender" },
   "players.editName": { id: "Edit nama", en: "Edit name" },
   "players.remove": { id: "Hapus pemain", en: "Remove player" },
+  "players.paid": { id: "Lunas", en: "Paid" },
+  "players.paidStatus": { id: "Sudah bayar", en: "Paid" },
   "players.removeConfirm": {
     id: "Hapus pemain ini dari sesi? Statistik di sesi ini akan hilang. Roster tidak terpengaruh.",
     en: "Remove this player from the session? Their stats in this session will be lost. The roster is not affected.",
@@ -137,6 +139,10 @@ export const DICT = {
   "leaderboard.empty": { id: "Belum ada hasil match.", en: "No match results yet." },
   "leaderboard.colPlayer": { id: "Pemain", en: "Player" },
   "leaderboard.winRate": { id: "Win rate", en: "Win rate" },
+  "leaderboard.cockTitle": {
+    id: "Total kok yang dipakai pemain ini",
+    en: "Total shuttlecocks used by this player",
+  },
   "leaderboard.bonusTitle": {
     id: "Bonus poin jatah main tertinggal",
     en: "Bonus points for missed play turns",
@@ -149,6 +155,7 @@ export const DICT = {
     en: "Press the button below to lock the final result & show the champion.",
   },
   "finish.leader": { id: "Pemuncak sementara", en: "Current leader" },
+  "finish.cockTotal": { id: "Total kok kepakai", en: "Total shuttlecocks used" },
   "finish.winsPoints": {
     id: "{wins} menang · diff {diff} · {points} poin",
     en: "{wins} wins · diff {diff} · {points} points",
@@ -365,6 +372,14 @@ export const DICT = {
   "createSession.courts": { id: "Jumlah lapangan", en: "Number of courts" },
   "createSession.courtNames": { id: "Nama lapangan (opsional)", en: "Court names (optional)" },
   "createSession.courtPlaceholder": { id: "Lapangan {n}", en: "Court {n}" },
+  "createSession.trackShuttlecocks": {
+    id: "Gunakan perhitungan kok?",
+    en: "Track shuttlecock usage?",
+  },
+  "createSession.trackShuttlecocksDesc": {
+    id: "Catat pemakaian kok tiap match. Aktifkan bila kok dibayar terpisah dari lapangan.",
+    en: "Record shuttlecock usage per match. Turn on if shuttlecocks are paid separately from the court.",
+  },
   "createSession.schedule": {
     id: "Jadwal (opsional — isi jika ingin dijadwalkan)",
     en: "Schedule (optional — fill in to schedule it)",
@@ -386,6 +401,8 @@ export const DICT = {
   "finishMatch.winner": { id: "🏆 Pemenang: {name}", en: "🏆 Winner: {name}" },
   "finishMatch.saving": { id: "Menyimpan…", en: "Saving…" },
   "finishMatch.save": { id: "Simpan", en: "Save" },
+  "finishMatch.shuttlecocks": { id: "Kok kepakai", en: "Shuttlecocks used" },
+  "finishMatch.shuttlecocksHint": { id: "per biji (opsional)", en: "per piece (optional)" },
 
   // Edit score dialog
   "editScore.title": { id: "Edit Skor", en: "Edit Score" },

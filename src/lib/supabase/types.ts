@@ -32,6 +32,8 @@ export interface DbSession {
   scheduled_at: string | null;
   created_at: string;
   finished_at: string | null;
+  /** Poin 5: bila true, host mencatat pemakaian kok per match (opt-in). */
+  track_shuttlecocks: boolean;
 }
 
 export interface DbSessionPlayer {
@@ -51,6 +53,8 @@ export interface DbSessionPlayer {
   draws: number;
   points_scored: number;
   points_conceded: number;
+  /** Poin 5: status bayar pemain di mabar ini (lunas/belum). */
+  paid: boolean;
   created_at: string;
 }
 
@@ -76,6 +80,8 @@ export interface DbMatch {
   score_a: number | null;
   score_b: number | null;
   winner: "a" | "b" | "draw" | null;
+  /** Poin 5: jumlah kok yang dipakai di match ini (per biji). Default 0. */
+  shuttlecocks: number;
   created_at: string;
   started_at: string | null;
   finished_at: string | null;

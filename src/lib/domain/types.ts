@@ -66,6 +66,8 @@ export interface SessionPlayer {
   draws: number;
   pointsScored: number;
   pointsConceded: number;
+  /** Poin 5: status bayar pemain di mabar ini (lunas/belum). */
+  paid: boolean;
 }
 
 /** Satu tim (pasangan ganda). */
@@ -92,6 +94,8 @@ export interface Match {
   score: { a: number; b: number } | null;
   /** Pemenang: "a" | "b" | "draw" | null (belum selesai). */
   winner: "a" | "b" | "draw" | null;
+  /** Poin 5: jumlah kok yang dipakai di match ini (per biji). 0 bila tak dicatat. */
+  shuttlecocks: number;
 }
 
 /** Konfigurasi bobot & penalti untuk matchmaking (mudah di-tune). */

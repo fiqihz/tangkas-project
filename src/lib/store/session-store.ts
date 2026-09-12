@@ -59,6 +59,7 @@ interface SessionState {
     status?: "scheduled" | "ongoing";
     scheduledAt?: string | null;
     courtLabels?: string[];
+    trackShuttlecocks?: boolean;
     open?: boolean;
   }) => Promise<DbSession | null>;
   startSession: (sessionId: string) => Promise<void>;
@@ -144,7 +145,10 @@ interface SessionState {
     scoreA: number,
     scoreB: number,
     winner: "a" | "b" | "draw",
+    shuttlecocks?: number,
   ) => Promise<void>;
+  /** Poin 5: set status bayar (lunas/belum) seorang pemain. */
+  setPlayerPaid: (playerId: string, paid: boolean) => Promise<void>;
   editMatchScore: (
     matchId: string,
     scoreA: number,
@@ -174,7 +178,14 @@ interface SessionState {
   incrementSessionsForPlayed: () => Promise<void>;
 
   /** Hasil akhir sesi yang baru saja diselesaikan (untuk halaman Final Result). */
-  finishedResult: { name: string; players: SessionPlayer[] } | null;
+  finishedResult: {
+    name: string;
+    players: SessionPlayer[];
+    /** Poin 5: snapshot match (untuk hitung kok per pemain & total di hasil akhir). */
+    matches: Match[];
+    /** Poin 5: apakah mabar ini mencatat pemakaian kok. */
+    trackShuttlecocks: boolean;
+  } | null;
   clearFinishedResult: () => void;
 }
 
@@ -401,6 +412,7 @@ export const useSessionStore = create<SessionState>((set, get) => ({
         status: opts.status ?? "ongoing",
         scheduledAt: opts.scheduledAt ?? null,
         courtLabels: opts.courtLabels,
+        trackShuttlecocks: opts.trackShuttlecocks ?? false,
         communityId,
       });
       await get().loadSessions();
@@ -472,7 +484,7 @@ export const useSessionStore = create<SessionState>((set, get) => ({
   },
 
   async finishSession() {
-    const { session, players } = get();
+    const { session, players, matches } = get();
     if (!session) return;
     try {
       // Atomik: increment sessions_played (pemain yang main) + set sesi
@@ -489,6 +501,8 @@ export const useSessionStore = create<SessionState>((set, get) => ({
       finishedResult: {
         name: session.name,
         players: players.filter((p) => p.gamesPlayed > 0),
+        matches,
+        trackShuttlecocks: session.track_shuttlecocks ?? false,
       },
       // keluar dari board; setelah tutup Final Result -> kembali ke list
       session: null,
@@ -624,6 +638,22 @@ export const useSessionStore = create<SessionState>((set, get) => ({
       await get().refresh();
     } catch (e) {
       set({ actionError: `Gagal mengubah status pemain: ${describe(e)}.` });
+    }
+  },
+
+  async setPlayerPaid(playerId, paid) {
+    // Optimistic: langsung update lokal agar toggle terasa instan, lalu persist.
+    set({
+      players: get().players.map((p) =>
+        p.id === playerId ? { ...p, paid } : p,
+      ),
+    });
+    try {
+      await repo.setSessionPlayerPaid(playerId, paid);
+      await get().refresh();
+    } catch (e) {
+      set({ actionError: `Gagal mengubah status bayar: ${describe(e)}.` });
+      await get().refresh(); // kembalikan ke state DB bila gagal
     }
   },
 
@@ -1147,7 +1177,7 @@ export const useSessionStore = create<SessionState>((set, get) => ({
     }
   },
 
-  async finishMatch(matchId, scoreA, scoreB, winner) {
+  async finishMatch(matchId, scoreA, scoreB, winner, shuttlecocks = 0) {
     const { matches, players, session } = get();
     if (!session) return;
     const match = matches.find((m) => m.id === matchId);
@@ -1159,7 +1189,7 @@ export const useSessionStore = create<SessionState>((set, get) => ({
       // multi-device. Menggantikan pola lama (update match lalu Promise.all
       // updateSessionPlayer) yang bisa korup bila gagal di tengah.
       void players; // stats dihitung di DB; snapshot lokal tak lagi dipakai
-      await repo.finishMatchAtomic(matchId, scoreA, scoreB, winner);
+      await repo.finishMatchAtomic(matchId, scoreA, scoreB, winner, shuttlecocks);
     } catch (e) {
       set({ actionError: `Gagal menyimpan skor: ${describe(e)}. Coba lagi.` });
     }

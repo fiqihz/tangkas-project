@@ -6,13 +6,15 @@ import { Button } from "@/components/ui/button";
 import { Card, CardContent } from "@/components/ui/card";
 import { Sheet, SheetContent, SheetTitle } from "@/components/ui/sheet";
 import { buildLeaderboard } from "@/lib/domain/leaderboard";
+import { shuttlecockStats } from "@/lib/domain/shuttlecock";
 import { useSessionStore } from "@/lib/store/session-store";
 import { useT } from "@/lib/store/settings-store";
 import { haptic } from "@/lib/haptics";
 
 export function FinishScreen() {
-  const { players, finishSession } = useSessionStore();
+  const { players, matches, session, finishSession } = useSessionStore();
   const t = useT();
+  const trackShuttlecocks = session?.track_shuttlecocks ?? false;
   const [confirming, setConfirming] = useState(false);
   const [finishing, setFinishing] = useState(false);
 
@@ -21,6 +23,10 @@ export function FinishScreen() {
     [players],
   );
   const champion = rows[0];
+  const cockTotal = useMemo(
+    () => shuttlecockStats(matches).sessionTotal,
+    [matches],
+  );
 
   const doFinish = async () => {
     haptic([20, 40, 20]);
@@ -68,6 +74,17 @@ export function FinishScreen() {
         <p className="text-sm text-muted-foreground">
           {t("finish.noResult")}
         </p>
+      )}
+
+      {trackShuttlecocks && (
+        <Card>
+          <CardContent className="flex items-center justify-between py-3">
+            <span className="flex items-center gap-2 text-sm font-medium">
+              🏸 {t("finish.cockTotal")}
+            </span>
+            <span className="text-lg font-bold">{cockTotal}</span>
+          </CardContent>
+        </Card>
       )}
 
       <Button

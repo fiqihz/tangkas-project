@@ -2,18 +2,26 @@
 
 import { useMemo } from "react";
 import { buildLeaderboard } from "@/lib/domain/leaderboard";
+import { shuttlecockStats } from "@/lib/domain/shuttlecock";
 import { useSessionStore } from "@/lib/store/session-store";
 import { useT } from "@/lib/store/settings-store";
 import { cn } from "@/lib/utils";
 import { EmptyCourt } from "@/components/ui/empty-court";
 
 export function LeaderboardScreen() {
-  const { players } = useSessionStore();
+  const { players, matches, session } = useSessionStore();
   const t = useT();
+  const trackShuttlecocks = session?.track_shuttlecocks ?? false;
 
   const rows = useMemo(
     () => buildLeaderboard(players.filter((p) => p.gamesPlayed > 0)),
     [players],
+  );
+
+  // Poin 5: kok per pemain (angka penuh) — dihitung dari match yang finished.
+  const cockPerPlayer = useMemo(
+    () => shuttlecockStats(matches).perPlayer,
+    [matches],
   );
 
   return (
@@ -52,6 +60,14 @@ export function LeaderboardScreen() {
                 </th>
                 <th className="px-1.5 py-2 text-center">Diff</th>
                 <th className="px-1.5 py-2 text-center">Poin</th>
+                {trackShuttlecocks && (
+                  <th
+                    className="px-1.5 py-2 text-center"
+                    title={t("leaderboard.cockTitle")}
+                  >
+                    🏸
+                  </th>
+                )}
               </tr>
             </thead>
             <tbody>
@@ -86,6 +102,11 @@ export function LeaderboardScreen() {
                     {r.pointDiff}
                   </td>
                   <td className="px-1.5 py-2 text-center">{r.pointsScored}</td>
+                  {trackShuttlecocks && (
+                    <td className="px-1.5 py-2 text-center text-muted-foreground">
+                      {cockPerPlayer.get(r.playerId) ?? 0}
+                    </td>
+                  )}
                 </tr>
               ))}
             </tbody>

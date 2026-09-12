@@ -18,10 +18,13 @@ export function FinishMatchDialog({
   byId: Map<string, SessionPlayer>;
   onClose: () => void;
 }) {
-  const { finishMatch } = useSessionStore();
+  const { finishMatch, session } = useSessionStore();
   const t = useT();
+  const trackShuttlecocks = session?.track_shuttlecocks ?? false;
   const [scoreA, setScoreA] = useState("");
   const [scoreB, setScoreB] = useState("");
+  // Default 1 kok (asumsi minimal 1 kepakai); host bisa ubah/kosongkan.
+  const [shuttlecocks, setShuttlecocks] = useState("1");
   const [submitting, setSubmitting] = useState(false);
 
   const name = (id: string) => byId.get(id)?.name ?? "?";
@@ -37,7 +40,11 @@ export function FinishMatchDialog({
     haptic(20);
     setSubmitting(true);
     const winner = a > b ? "a" : b > a ? "b" : "draw";
-    await finishMatch(match.id, a, b, winner);
+    // Kok opsional: kosong / non-angka dianggap 0.
+    const cocks = trackShuttlecocks
+      ? Math.max(0, parseInt(shuttlecocks, 10) || 0)
+      : 0;
+    await finishMatch(match.id, a, b, winner, cocks);
     setSubmitting(false);
     onClose();
   };
@@ -88,6 +95,51 @@ export function FinishMatchDialog({
           <p className="mt-2 text-sm font-medium text-primary">
             {t("finishMatch.winner", { name: a > b ? teamAName : teamBName })}
           </p>
+        )}
+
+        {trackShuttlecocks && (
+          <div className="mt-4">
+            <label className="mb-1 block text-sm font-medium">
+              {t("finishMatch.shuttlecocks")}
+            </label>
+            <div className="flex items-center gap-3">
+              <Button
+                type="button"
+                variant="outline"
+                size="icon"
+                onClick={() => {
+                  haptic(8);
+                  setShuttlecocks((s) =>
+                    String(Math.max(0, (parseInt(s, 10) || 0) - 1)),
+                  );
+                }}
+              >
+                −
+              </Button>
+              <Input
+                type="number"
+                inputMode="numeric"
+                min={0}
+                value={shuttlecocks}
+                onChange={(e) => setShuttlecocks(e.target.value)}
+                className="h-11 w-16 text-center text-lg font-bold"
+              />
+              <Button
+                type="button"
+                variant="outline"
+                size="icon"
+                onClick={() => {
+                  haptic(8);
+                  setShuttlecocks((s) => String((parseInt(s, 10) || 0) + 1));
+                }}
+              >
+                +
+              </Button>
+              <span className="text-xs text-muted-foreground">
+                {t("finishMatch.shuttlecocksHint")}
+              </span>
+            </div>
+          </div>
         )}
 
         <div className="mt-5 flex gap-2">

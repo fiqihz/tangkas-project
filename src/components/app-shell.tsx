@@ -106,6 +106,8 @@ function AppShellContent() {
       <FinalResultScreen
         name={finishedResult.name}
         players={finishedResult.players}
+        matches={finishedResult.matches}
+        trackShuttlecocks={finishedResult.trackShuttlecocks}
       />
     );
   }

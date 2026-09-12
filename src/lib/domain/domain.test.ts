@@ -132,6 +132,7 @@ describe("scoring & leaderboard", () => {
       state: "finished",
       score: { a: 30, b: 26 },
       winner: "a",
+      shuttlecocks: 0,
     };
     players = applyMatchResult(players, match);
     const byId = Object.fromEntries(players.map((p) => [p.id, p]));

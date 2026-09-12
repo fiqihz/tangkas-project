@@ -6,7 +6,8 @@ import { RotateCcw, Share2 } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Toast } from "@/components/ui/toast";
 import { buildLeaderboard } from "@/lib/domain/leaderboard";
-import type { SessionPlayer } from "@/lib/domain/types";
+import { shuttlecockStats } from "@/lib/domain/shuttlecock";
+import type { Match, SessionPlayer } from "@/lib/domain/types";
 import { useSessionStore } from "@/lib/store/session-store";
 import { buildResultText, shareResultText } from "@/lib/share-result";
 import { haptic } from "@/lib/haptics";
@@ -20,9 +21,13 @@ import { cn } from "@/lib/utils";
 export function FinalResultScreen({
   name,
   players,
+  matches = [],
+  trackShuttlecocks = false,
 }: {
   name: string;
   players: SessionPlayer[];
+  matches?: Match[];
+  trackShuttlecocks?: boolean;
 }) {
   const { clearFinishedResult } = useSessionStore();
   const [toast, setToast] = useState<string | null>(null);
@@ -30,6 +35,7 @@ export function FinalResultScreen({
   const rows = useMemo(() => buildLeaderboard(players), [players]);
   const podium = rows.slice(0, 3);
   const rest = rows.slice(3);
+  const cocks = useMemo(() => shuttlecockStats(matches), [matches]);
 
   const newSession = () => {
     haptic([20, 40]);
@@ -78,6 +84,9 @@ export function FinalResultScreen({
                       <th className="px-1.5 py-2 text-center">+M</th>
                       <th className="px-1.5 py-2 text-center">Diff</th>
                       <th className="px-1.5 py-2 text-center">Poin</th>
+                      {trackShuttlecocks && (
+                        <th className="px-1.5 py-2 text-center">🏸</th>
+                      )}
                     </tr>
                   </thead>
                   <tbody>
@@ -100,10 +109,24 @@ export function FinalResultScreen({
                         <td className="px-1.5 py-2 text-center">
                           {r.pointsScored}
                         </td>
+                        {trackShuttlecocks && (
+                          <td className="px-1.5 py-2 text-center text-muted-foreground">
+                            {cocks.perPlayer.get(r.playerId) ?? 0}
+                          </td>
+                        )}
                       </tr>
                     ))}
                   </tbody>
                 </table>
+              </div>
+            )}
+
+            {trackShuttlecocks && (
+              <div className="mt-4 flex items-center justify-between rounded-xl border border-border bg-secondary/30 px-4 py-3">
+                <span className="flex items-center gap-2 text-sm font-medium">
+                  🏸 Total kok kepakai
+                </span>
+                <span className="text-lg font-bold">{cocks.sessionTotal}</span>
               </div>
             )}
           </>

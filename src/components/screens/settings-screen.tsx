@@ -4,6 +4,7 @@ import { Moon, Sun, Languages, LogOut } from "lucide-react";
 import { useRouter } from "next/navigation";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent } from "@/components/ui/card";
+import { ToggleSwitch } from "@/components/ui/toggle-switch";
 import { ManageAdminsButton } from "@/components/app/manage-admins-dialog";
 import { useSettingsStore } from "@/lib/store/settings-store";
 import { useAuthStore } from "@/lib/store/auth-store";
@@ -123,35 +124,6 @@ export function SettingsScreen() {
   );
 }
 
-function ToggleSwitch({
-  checked,
-  onChange,
-  label,
-}: {
-  checked: boolean;
-  onChange: (v: boolean) => void;
-  label: string;
-}) {
-  return (
-    <button
-      role="switch"
-      aria-checked={checked}
-      aria-label={label}
-      onClick={() => onChange(!checked)}
-      className={cn(
-        "relative h-7 w-12 shrink-0 rounded-full transition-colors",
-        checked ? "bg-primary" : "bg-muted",
-      )}
-    >
-      <span
-        className={cn(
-          "absolute left-1 top-1 h-5 w-5 rounded-full bg-white shadow transition-transform",
-          checked ? "translate-x-5" : "translate-x-0",
-        )}
-      />
-    </button>
-  );
-}
 
 function LangOption({
   active,

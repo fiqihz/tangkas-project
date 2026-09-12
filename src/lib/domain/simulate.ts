@@ -25,6 +25,7 @@ function mk(name: string, level: Level): SessionPlayer {
     draws: 0,
     pointsScored: 0,
     pointsConceded: 0,
+    paid: false,
   };
 }
 
@@ -88,6 +89,7 @@ function main() {
         state: "finished",
         score: aWins ? { a: 30, b: 20 + Math.floor(Math.random() * 9) } : { a: 20 + Math.floor(Math.random() * 9), b: 30 },
         winner: aWins ? "a" : "b",
+        shuttlecocks: 0,
       };
       roundMatches.push(match);
     }

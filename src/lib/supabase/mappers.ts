@@ -23,6 +23,7 @@ export function toSessionPlayer(row: DbSessionPlayer): SessionPlayer {
     draws: row.draws,
     pointsScored: row.points_scored,
     pointsConceded: row.points_conceded,
+    paid: row.paid ?? false,
   };
 }
 
@@ -42,5 +43,6 @@ export function toMatch(row: DbMatch): Match {
         ? { a: row.score_a, b: row.score_b }
         : null,
     winner: row.winner,
+    shuttlecocks: row.shuttlecocks ?? 0,
   };
 }

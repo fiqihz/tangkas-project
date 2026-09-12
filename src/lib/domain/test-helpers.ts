@@ -23,6 +23,7 @@ export function makePlayer(
     draws: 0,
     pointsScored: 0,
     pointsConceded: 0,
+    paid: false,
     ...overrides,
   };
 }

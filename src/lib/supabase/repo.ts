@@ -159,6 +159,7 @@ export async function createSession(opts: {
   status?: SessionStatus;
   scheduledAt?: string | null;
   courtLabels?: string[];
+  trackShuttlecocks?: boolean;
   communityId: string;
 }): Promise<DbSession> {
   const communityId = opts.communityId;
@@ -169,6 +170,7 @@ export async function createSession(opts: {
       courts: opts.courts,
       status: opts.status ?? "ongoing",
       scheduled_at: opts.scheduledAt ?? null,
+      track_shuttlecocks: opts.trackShuttlecocks ?? false,
       community_id: communityId,
     })
     .select("*")
@@ -453,6 +455,7 @@ export async function finishMatch(
   scoreA: number,
   scoreB: number,
   winner: "a" | "b" | "draw",
+  shuttlecocks = 0,
 ): Promise<void> {
   const { error } = await db()
     .from("match")
@@ -461,9 +464,22 @@ export async function finishMatch(
       score_a: scoreA,
       score_b: scoreB,
       winner,
+      shuttlecocks: Math.max(0, shuttlecocks),
       finished_at: new Date().toISOString(),
     })
     .eq("id", matchId);
+  if (error) throw error;
+}
+
+/** Set status bayar (lunas/belum) seorang pemain di mabar ini. */
+export async function setSessionPlayerPaid(
+  sessionPlayerId: string,
+  paid: boolean,
+): Promise<void> {
+  const { error } = await db()
+    .from("session_player")
+    .update({ paid })
+    .eq("id", sessionPlayerId);
   if (error) throw error;
 }
 
@@ -481,12 +497,14 @@ export async function finishMatchAtomic(
   scoreA: number,
   scoreB: number,
   winner: "a" | "b" | "draw",
+  shuttlecocks = 0,
 ): Promise<void> {
   const { error } = await db().rpc("finish_match_atomic", {
     p_match_id: matchId,
     p_score_a: scoreA,
     p_score_b: scoreB,
     p_winner: winner,
+    p_shuttlecocks: Math.max(0, shuttlecocks),
   });
   if (error) throw error;
 }

@@ -20,6 +20,7 @@ import { LevelBadge } from "@/components/ui/level-badge";
 import { LevelSelect } from "@/components/ui/level-select";
 import { GenderSelect, GenderBadge } from "@/components/ui/gender-select";
 import { Fab } from "@/components/ui/fab";
+import { ToggleSwitch } from "@/components/ui/toggle-switch";
 import type { Gender, Level, PlayerStatus, SessionPlayer } from "@/lib/domain/types";
 import { sortByQueuePriority } from "@/lib/domain/queue";
 import { useSessionStore } from "@/lib/store/session-store";
@@ -58,6 +59,7 @@ export function PlayersScreen() {
     setPlayerStatus,
     setPlayerGender,
     setPlayerName,
+    setPlayerPaid,
     removePlayer,
   } = useSessionStore();
   const t = useT();
@@ -214,6 +216,7 @@ export function PlayersScreen() {
                         onSetGender={(g) => setPlayerGender(p.id, g)}
                         onSetStatus={(s) => setPlayerStatus(p.id, s)}
                         onSetName={(name) => setPlayerName(p.id, name)}
+                        onSetPaid={(paid) => setPlayerPaid(p.id, paid)}
                         onRemove={() => removePlayer(p.id)}
                       />
                     ),
@@ -250,6 +253,7 @@ function PlayerRow({
   onSetGender,
   onSetStatus,
   onSetName,
+  onSetPaid,
   onRemove,
 }: {
   player: SessionPlayer;
@@ -260,6 +264,7 @@ function PlayerRow({
   onSetGender: (g: Gender) => void;
   onSetStatus: (s: PlayerStatus) => void;
   onSetName: (name: string) => void;
+  onSetPaid: (paid: boolean) => void;
   onRemove: () => Promise<{ ok: boolean; reason?: string }>;
 }) {
   const t = useT();
@@ -307,6 +312,11 @@ function PlayerRow({
             <GenderBadge gender={player.gender} />
           </div>
           <div className="flex shrink-0 items-center gap-2">
+            {player.paid && (
+              <span className="rounded-md bg-emerald-500/15 px-1.5 py-0.5 text-[10px] font-medium text-emerald-600 dark:text-emerald-400">
+                {t("players.paid")}
+              </span>
+            )}
             {queue && <QueueBadge queue={queue} />}
             <span className="text-xs text-muted-foreground">
               {player.gamesPlayed}x
@@ -380,6 +390,19 @@ function PlayerRow({
                 value={player.gender}
                 onChange={onSetGender}
                 size="sm"
+              />
+            </div>
+            <div className="flex items-center justify-between gap-3 rounded-xl border border-border bg-secondary/30 px-3 py-2">
+              <div className="text-sm font-medium">
+                {t("players.paidStatus")}
+              </div>
+              <ToggleSwitch
+                checked={player.paid}
+                onChange={(v) => {
+                  haptic(8);
+                  onSetPaid(v);
+                }}
+                label={t("players.paidStatus")}
               />
             </div>
             <div className="flex flex-wrap gap-2">
