@@ -22,15 +22,22 @@ import { GenderBadge, GenderSelect } from "@/components/ui/gender-select";
 import { Fab } from "@/components/ui/fab";
 import { Sheet, SheetContent, SheetTitle } from "@/components/ui/sheet";
 import { Toast } from "@/components/ui/toast";
-import type {
-  Gender,
-  Level,
-  Match,
-  MatchMode,
-  SessionPlayer,
+import {
+  LEVEL_LABEL,
+  type Gender,
+  type Level,
+  type Match,
+  type MatchMode,
+  type SessionPlayer,
 } from "@/lib/domain/types";
+import type { WaitingSummary } from "@/lib/domain/pool-insight";
 import { useSessionStore } from "@/lib/store/session-store";
 import { useT } from "@/lib/store/settings-store";
+import {
+  feasibilityForModes,
+  summarizeWaiting,
+  type ModeFeasibility,
+} from "@/lib/domain/pool-insight";
 import type { DictKey } from "@/lib/i18n/dict";
 import { haptic } from "@/lib/haptics";
 import { cn } from "@/lib/utils";
@@ -54,6 +61,8 @@ export function CourtsScreen() {
     canUseFirstMatch,
     setPlayerLevel,
     setPlayerGender,
+    busyPlayerIds,
+    session,
   } = useSessionStore();
   const t = useT();
   // Apakah mode "Match Pertama (urut check-in)" boleh dipakai saat ini.
@@ -111,6 +120,31 @@ export function CourtsScreen() {
   const waiting = activePlayers.filter((p) => !playingIds.has(p.id));
   const noLevelWaiting = waiting.filter((p) => p.level === null);
 
+  // Poin 3 (A & C): ringkasan pool menunggu + kelayakan tiap mode dari pemain
+  // yang benar-benar TERSEDIA (kecualikan yang di proposed/playing = busy).
+  const busy = busyPlayerIds();
+  const round = (session?.current_round ?? 0) + 1;
+  // busy adalah Set baru tiap render; pakai kunci stabil dari isinya sebagai
+  // dependency memo (hindari re-compute tiap render, tapi tetap update saat
+  // isi berubah).
+  const busyKey = [...busy].sort().join(",");
+  const waitingSummary = useMemo(
+    () => summarizeWaiting(players, busy),
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+    [players, busyKey],
+  );
+  const feasibility = useMemo(
+    () =>
+      feasibilityForModes(
+        players,
+        busy,
+        MODE_OPTIONS.map((m) => m.value),
+        round,
+      ),
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+    [players, busyKey, round],
+  );
+
   return (
     <div className="flex flex-col gap-4">
       <div className="flex items-center justify-between">
@@ -122,6 +156,13 @@ export function CourtsScreen() {
           })}
         </span>
       </div>
+
+      {/* Poin 3C: ringkasan pemain menunggu — bantu host lihat sekilas
+          "siapa yang siap main berikutnya" & komposisinya (gender/level),
+          supaya tidak trial-and-error di mode picker. */}
+      {waitingSummary.waitingTotal > 0 && (
+        <WaitingPanel summary={waitingSummary} />
+      )}
 
       {/* Info: pemain belum ber-level di-skip dari rekomendasi otomatis */}
       {noLevelWaiting.length > 0 && (
@@ -297,6 +338,7 @@ export function CourtsScreen() {
       {modeForCourt && (
         <ModePickerSheet
           firstMatchEligible={firstMatchEligible}
+          feasibility={feasibility}
           // Sembunyikan opsi "Match Pertama" di dalam sheet bila sheet dibuka
           // dari lapangan KOSONG — di sana sudah ada tombol First Match sendiri
           // di kartu (hindari redundansi). Di lapangan yang sedang jalan
@@ -617,6 +659,51 @@ function LockedPreview({
 }
 
 
+/**
+ * Poin 3C: panel ringkasan pemain menunggu. Menunjukkan berapa yang siap main
+ * berikutnya + komposisi gender & level, supaya host bisa langsung paham mode
+ * mana yang realistis (mis. "cewek cuma 2 → ganda putri belum bisa") tanpa
+ * harus coba-coba di mode picker.
+ */
+function WaitingPanel({ summary }: { summary: WaitingSummary }) {
+  const levelOrder: Level[] = ["advanced", "intermediate", "beginner", "newbie"];
+  const levelChips = levelOrder
+    .filter((lv) => summary.byLevel[lv] > 0)
+    .map((lv) => ({ label: LEVEL_LABEL[lv], count: summary.byLevel[lv] }));
+
+  return (
+    <div className="rounded-xl border border-border bg-secondary/30 px-3 py-2.5">
+      <div className="flex flex-wrap items-center gap-x-2 gap-y-1 text-sm">
+        <span className="font-semibold">
+          {summary.readyLeveled} siap main
+        </span>
+        <span className="text-muted-foreground">
+          dari {summary.waitingTotal} menunggu
+        </span>
+        {summary.noLevel > 0 && (
+          <span className="rounded bg-sky-500/15 px-1.5 py-0.5 text-[11px] font-medium text-sky-600 dark:text-sky-400">
+            {summary.noLevel} belum ber-level
+          </span>
+        )}
+      </div>
+      <div className="mt-1.5 flex flex-wrap items-center gap-1.5 text-[11px]">
+        <span className="rounded-md bg-background px-1.5 py-0.5 text-muted-foreground">
+          ♂ {summary.byGender.male} · ♀ {summary.byGender.female}
+          {summary.byGender.unknown > 0 && ` · ? ${summary.byGender.unknown}`}
+        </span>
+        {levelChips.map((c) => (
+          <span
+            key={c.label}
+            className="rounded-md bg-background px-1.5 py-0.5 text-muted-foreground"
+          >
+            {c.label} {c.count}
+          </span>
+        ))}
+      </div>
+    </div>
+  );
+}
+
 function CompleteInfoDialog({
   match,
   byId,
@@ -744,12 +831,15 @@ const MODE_OPTIONS: {
 
 function ModePickerSheet({
   firstMatchEligible,
+  feasibility,
   showFirstMatch,
   onPick,
   onPickFirstMatch,
   onClose,
 }: {
   firstMatchEligible: boolean;
+  /** Kelayakan tiap mode dari pool pemain menunggu saat ini (Poin 3A). */
+  feasibility: Record<MatchMode, ModeFeasibility>;
   /** Tampilkan opsi "Match Pertama" di dalam sheet. False untuk lapangan kosong
    *  (sudah punya tombol tersendiri di kartu → hindari redundansi). */
   showFirstMatch: boolean;
@@ -815,22 +905,41 @@ function ModePickerSheet({
             </>
           )}
 
-          {MODE_OPTIONS.map((m) => (
-            <button
-              key={m.value}
-              onClick={() => {
-                haptic(12);
-                onPick(m.value);
-              }}
-              className="flex select-none items-start gap-3 rounded-xl border border-border bg-secondary/40 px-3.5 py-3 text-left transition-all active:scale-[0.99] active:bg-secondary"
-            >
-              <span className="text-xl leading-none">{m.emoji}</span>
-              <span className="flex min-w-0 flex-col gap-0.5">
-                <span className="font-semibold">{t(m.labelKey)}</span>
-                <span className="text-xs text-muted-foreground">{t(m.descKey)}</span>
-              </span>
-            </button>
-          ))}
+          {MODE_OPTIONS.map((m) => {
+            const feas = feasibility[m.value];
+            // Tetap bisa ditekan walau belum feasible (host mungkin mau lihat
+            // pesan lengkap / mengubah pemain dulu), tapi tampil redup + badge
+            // supaya ekspektasi jelas di depan — bukan gagal setelah ditekan.
+            const unavailable = feas && !feas.feasible;
+            return (
+              <button
+                key={m.value}
+                onClick={() => {
+                  haptic(12);
+                  onPick(m.value);
+                }}
+                className={cn(
+                  "flex select-none items-start gap-3 rounded-xl border border-border px-3.5 py-3 text-left transition-all active:scale-[0.99] active:bg-secondary",
+                  unavailable ? "bg-secondary/20 opacity-60" : "bg-secondary/40",
+                )}
+              >
+                <span className="text-xl leading-none">{m.emoji}</span>
+                <span className="flex min-w-0 flex-col gap-0.5">
+                  <span className="flex items-center gap-1.5 font-semibold">
+                    {t(m.labelKey)}
+                    {unavailable && (
+                      <span className="shrink-0 rounded bg-amber-500/15 px-1.5 py-0.5 text-[10px] font-medium text-amber-600 dark:text-amber-400">
+                        belum bisa
+                      </span>
+                    )}
+                  </span>
+                  <span className="text-xs text-muted-foreground">
+                    {unavailable && feas.hint ? feas.hint : t(m.descKey)}
+                  </span>
+                </span>
+              </button>
+            );
+          })}
           <Button variant="outline" className="mt-1" onClick={onClose}>
             {t("common.cancel")}
           </Button>

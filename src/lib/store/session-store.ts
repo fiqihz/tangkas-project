@@ -927,6 +927,11 @@ export const useSessionStore = create<SessionState>((set, get) => ({
         ? waitingIds
         : new Set<string>();
 
+    // Berapa pemain yang sedang dipakai lapangan lain (main/preview). Dipakai
+    // untuk pesan yang menjelaskan "kenapa mode ini terasa tidak bisa dipakai
+    // lagi": pemain yang cocok sedang main, bukan karena mode-nya dikunci.
+    const busyCount = busy.size;
+
     if (pool.length < 4) {
       // Bangun penjelasan kenapa pemain kurang.
       const notCheckedIn = players.filter(
@@ -936,11 +941,15 @@ export const useSessionStore = create<SessionState>((set, get) => ({
         (p) => p.status === "active" && p.level === null && !busy.has(p.id),
       ).length;
       const parts: string[] = [`Pemain siap cuma ${pool.length} (butuh 4).`];
+      if (busyCount > 0)
+        parts.push(`${busyCount} pemain sedang main/di-preview lapangan lain.`);
       if (notCheckedIn > 0)
         parts.push(`${notCheckedIn} pemain belum check-in — check-in di tab Pemain.`);
       if (noLevel > 0)
         parts.push(`${noLevel} pemain Active belum di-set level.`);
-      if (notCheckedIn === 0 && noLevel === 0)
+      if (notCheckedIn === 0 && noLevel === 0 && busyCount > 0)
+        parts.push("Tunggu salah satu match selesai, atau isi manual.");
+      else if (notCheckedIn === 0 && noLevel === 0)
         parts.push("Semua pemain lain sedang main atau sudah di preview.");
       return { ok: false, reason: parts.join(" ") };
     }
@@ -969,6 +978,14 @@ export const useSessionStore = create<SessionState>((set, get) => ({
           "Tidak ada kombinasi valid dari pemain tersedia (cek aturan level Newbie).",
       };
 
+      // Saran actionable: bila banyak pemain sedang main di lapangan lain,
+      // mode ini bukan "terkunci" — pemain yang cocok cuma lagi dipakai. Kalau
+      // tidak, arahkan ke mode lain / isi manual.
+      const suggestion =
+        busyCount > 0
+          ? ` ${busyCount} pemain sedang main di lapangan lain — tunggu match selesai, pilih mode lain (mis. Seimbang), atau isi manual.`
+          : " Pilih mode lain (mis. Seimbang) atau isi manual.";
+
       if (newbieDeadEnd) {
         return {
           ok: false,
@@ -979,7 +996,10 @@ export const useSessionStore = create<SessionState>((set, get) => ({
         };
       }
 
-      return { ok: false, reason: modeReason[mode] ?? modeReason.balanced };
+      return {
+        ok: false,
+        reason: (modeReason[mode] ?? modeReason.balanced) + suggestion,
+      };
     }
 
     const courtLabel = courts.find((c) => c.id === courtId)?.label ?? null;
