@@ -101,8 +101,8 @@ export function buildLeaderboard(players: SessionPlayer[]): LeaderboardRow[] {
   });
 
   rows.sort((x, y) => {
-    if (y.wins !== x.wins) return y.wins - x.wins;
-    // Tie-break utama: total Poin (skor + bonus) lebih dulu, baru selisih poin.
+    // Acuan utama: total Poin (skor + bonus). Selisih poin jadi tie-break,
+    // baru nama. Jumlah menang TIDAK dipakai sebagai penentu urutan.
     if (y.pointsScored !== x.pointsScored) return y.pointsScored - x.pointsScored;
     if (y.pointDiff !== x.pointDiff) return y.pointDiff - x.pointDiff;
     return x.name.localeCompare(y.name);

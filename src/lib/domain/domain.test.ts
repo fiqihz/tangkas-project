@@ -143,7 +143,7 @@ describe("scoring & leaderboard", () => {
     expect(byId.A.pointsConceded).toBe(26);
   });
 
-  it("tie-break: menang & poin sama -> selisih poin menentukan", () => {
+  it("tie-break: poin sama -> selisih poin menentukan", () => {
     const players = [
       makePlayer("A", "beginner", { wins: 2, pointsScored: 60, pointsConceded: 40 }),
       makePlayer("B", "beginner", { wins: 2, pointsScored: 60, pointsConceded: 50 }),
@@ -153,15 +153,15 @@ describe("scoring & leaderboard", () => {
     expect(lb[0].rank).toBe(1);
   });
 
-  it("tie-break: menang sama -> poin lebih dulu daripada selisih poin", () => {
+  it("ranking: poin lebih tinggi menang walau menang lebih sedikit", () => {
     const players = [
-      // A: poin lebih rendah tapi diff lebih tinggi
-      makePlayer("A", "beginner", { wins: 2, pointsScored: 60, pointsConceded: 10 }),
-      // B: poin lebih tinggi tapi diff lebih rendah -> harus juara
-      makePlayer("B", "beginner", { wins: 2, pointsScored: 70, pointsConceded: 40 }),
+      // A: menang lebih banyak tapi poin lebih rendah
+      makePlayer("A", "beginner", { wins: 3, pointsScored: 100, pointsConceded: 40 }),
+      // B: menang lebih sedikit tapi poin lebih tinggi -> harus di atas
+      makePlayer("B", "beginner", { wins: 2, pointsScored: 114, pointsConceded: 102 }),
     ];
     const lb = buildLeaderboard(players);
-    expect(lb[0].name).toBe("B"); // poin 70 > 60 menang walau diff +30 < +50
+    expect(lb[0].name).toBe("B"); // poin 114 > 100, jumlah menang tidak dipakai
     expect(lb[0].rank).toBe(1);
   });
 });

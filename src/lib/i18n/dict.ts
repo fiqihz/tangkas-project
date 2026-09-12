@@ -130,8 +130,8 @@ export const DICT = {
   // Leaderboard / Livescore
   "leaderboard.title": { id: "Livescore", en: "Livescore" },
   "leaderboard.subtitle": {
-    id: "Update otomatis tiap match selesai. Urut: menang → total poin → selisih poin. +M = bonus poin untuk jatah main yang tertinggal.",
-    en: "Updates automatically after each match. Sorted by: wins → total points → point diff. +M = bonus points for missed play turns.",
+    id: "Update otomatis tiap match selesai. Urut: total poin → selisih poin. +M = bonus poin untuk jatah main yang tertinggal.",
+    en: "Updates automatically after each match. Sorted by: total points → point diff. +M = bonus points for missed play turns.",
   },
   "leaderboard.emptyTitle": { id: "Papan skor menunggu", en: "Scoreboard awaits" },
   "leaderboard.empty": { id: "Belum ada hasil match.", en: "No match results yet." },
