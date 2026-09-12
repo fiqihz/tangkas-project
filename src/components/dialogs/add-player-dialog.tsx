@@ -349,11 +349,10 @@ function NewPlayerTab({
 }) {
   const t = useT();
   const [name, setName] = useState("");
-  // Default diisi agar pemain baru langsung punya level & gender (mengurangi
-  // pemain "belum di-set level" yang memblokir reserve autofill). Keduanya
-  // tetap bisa diubah kapan saja lewat card pemain.
-  const [level, setLevel] = useState<Level | null>("beginner");
-  const [gender, setGender] = useState<Gender | null>("male");
+  // Tidak ada autofill: level & gender mulai kosong agar user memilih sendiri.
+  // Keduanya opsional dan tetap bisa diubah kapan saja lewat card pemain.
+  const [level, setLevel] = useState<Level | null>(null);
+  const [gender, setGender] = useState<Gender | null>(null);
   const [saving, setSaving] = useState(false);
 
   const dup = existingNames.has(name.trim().toLowerCase());

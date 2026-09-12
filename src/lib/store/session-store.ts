@@ -78,6 +78,12 @@ interface SessionState {
   setPlayerLevel: (playerId: string, level: Level) => Promise<void>;
   setPlayerStatus: (playerId: string, status: PlayerStatus) => Promise<void>;
   setPlayerName: (playerId: string, name: string) => Promise<void>;
+  /**
+   * Hapus pemain dari sesi ini (mis. salah menambah orang). Hanya menghapus
+   * baris session_player; roster/profil di community tidak ikut terhapus.
+   * Ditolak bila pemain sedang dialokasikan ke match (proposed/playing).
+   */
+  removePlayer: (playerId: string) => Promise<{ ok: boolean; reason?: string }>;
 
   // courts
   addCourt: () => Promise<void>;
@@ -606,6 +612,30 @@ export const useSessionStore = create<SessionState>((set, get) => ({
       await get().refresh();
     } catch (e) {
       set({ actionError: `Gagal mengubah status pemain: ${describe(e)}.` });
+    }
+  },
+
+  async removePlayer(playerId) {
+    const { session } = get();
+    if (!session) return { ok: false, reason: "no-session" };
+
+    // Jangan hapus pemain yang sedang dialokasikan ke lapangan (proposed/playing)
+    // agar susunan match tidak korup. Minta keluarkan dari match dulu.
+    if (get().busyPlayerIds().has(playerId)) {
+      const reason =
+        "Pemain sedang di lapangan. Keluarkan dari match dulu sebelum menghapus.";
+      set({ actionError: reason });
+      return { ok: false, reason };
+    }
+
+    try {
+      await repo.deleteSessionPlayer(playerId);
+      await get().refresh();
+      return { ok: true };
+    } catch (e) {
+      const reason = `Gagal menghapus pemain: ${describe(e)}.`;
+      set({ actionError: reason });
+      return { ok: false, reason };
     }
   },
 

@@ -10,6 +10,7 @@ import {
   Play,
   Plus,
   Search,
+  Trash2,
   X,
 } from "lucide-react";
 import { Button } from "@/components/ui/button";
@@ -57,6 +58,7 @@ export function PlayersScreen() {
     setPlayerStatus,
     setPlayerGender,
     setPlayerName,
+    removePlayer,
   } = useSessionStore();
   const t = useT();
   const [expanded, setExpanded] = useState<string | null>(null);
@@ -212,6 +214,7 @@ export function PlayersScreen() {
                         onSetGender={(g) => setPlayerGender(p.id, g)}
                         onSetStatus={(s) => setPlayerStatus(p.id, s)}
                         onSetName={(name) => setPlayerName(p.id, name)}
+                        onRemove={() => removePlayer(p.id)}
                       />
                     ),
                   )}
@@ -247,6 +250,7 @@ function PlayerRow({
   onSetGender,
   onSetStatus,
   onSetName,
+  onRemove,
 }: {
   player: SessionPlayer;
   queue?: QueueInfo;
@@ -256,6 +260,7 @@ function PlayerRow({
   onSetGender: (g: Gender) => void;
   onSetStatus: (s: PlayerStatus) => void;
   onSetName: (name: string) => void;
+  onRemove: () => Promise<{ ok: boolean; reason?: string }>;
 }) {
   const t = useT();
   // State edit nama: null = tidak sedang edit, string = draft nama.
@@ -266,6 +271,16 @@ function PlayerRow({
     setNameDraft(player.name);
   };
   const cancelEdit = () => setNameDraft(null);
+  const [removing, setRemoving] = useState(false);
+  const handleRemove = async () => {
+    // Konfirmasi agar tidak terhapus karena salah tap.
+    if (!window.confirm(t("players.removeConfirm"))) return;
+    haptic(20);
+    setRemoving(true);
+    const res = await onRemove();
+    // Bila gagal (mis. pemain sedang di lapangan), biarkan card tetap ada.
+    if (!res.ok) setRemoving(false);
+  };
   const saveName = () => {
     if (nameDraft === null) return;
     const trimmed = nameDraft.trim();
@@ -393,6 +408,16 @@ function PlayerRow({
                   <Play size={14} /> {t("players.setActive")}
                 </Button>
               )}
+              {/* Hapus pemain dari sesi (mis. salah menambah orang). */}
+              <Button
+                size="sm"
+                variant="destructive"
+                onClick={handleRemove}
+                disabled={removing}
+                className="ml-auto"
+              >
+                <Trash2 size={14} /> {t("players.remove")}
+              </Button>
             </div>
           </div>
         )}

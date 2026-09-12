@@ -312,6 +312,11 @@ export async function addSessionPlayer(
   return data;
 }
 
+export async function deleteSessionPlayer(id: string): Promise<void> {
+  const { error } = await db().from("session_player").delete().eq("id", id);
+  if (error) throw error;
+}
+
 export async function linkSessionPlayerProfile(
   sessionPlayerId: string,
   profileId: string,

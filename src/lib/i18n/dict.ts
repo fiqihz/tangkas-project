@@ -95,6 +95,11 @@ export const DICT = {
   "players.setLevel": { id: "Set level", en: "Set level" },
   "players.setGender": { id: "Set gender", en: "Set gender" },
   "players.editName": { id: "Edit nama", en: "Edit name" },
+  "players.remove": { id: "Hapus pemain", en: "Remove player" },
+  "players.removeConfirm": {
+    id: "Hapus pemain ini dari sesi? Statistik di sesi ini akan hilang. Roster tidak terpengaruh.",
+    en: "Remove this player from the session? Their stats in this session will be lost. The roster is not affected.",
+  },
   "players.namePlaceholder": { id: "Nama pemain", en: "Player name" },
   "players.notSet": { id: "(belum di-set)", en: "(not set)" },
   "players.emptyTitle": { id: "Lapangan masih sepi", en: "The court is empty" },
