@@ -227,6 +227,8 @@ export const DICT = {
     id: "Pasangkan pemain dengan level yang sama.",
     en: "Pair players of the same level.",
   },
+  "mode.needsBorrow": { id: "perlu pinjam", en: "needs borrow" },
+  "mode.unavailable": { id: "belum bisa", en: "unavailable" },
 
   // Reserve confirm (Poin D — pinjam pemain dari lapangan lain)
   "reserve.title": {

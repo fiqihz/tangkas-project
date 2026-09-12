@@ -29,14 +29,18 @@ export interface WaitingSummary {
   byLevel: Record<Level, number> & { unknown: number };
 }
 
-/** Kelayakan sebuah mode dari pool saat ini. */
+/**
+ * Kelayakan sebuah mode:
+ *  - "ok"          : bisa langsung dari pemain menunggu (tanpa pinjam).
+ *  - "needsBorrow" : tak bisa dari menunggu saja, TAPI bisa bila meminjam
+ *                    pemain yang sedang main (Poin D — akan minta konfirmasi).
+ *  - "impossible"  : tak bisa walau semua kandidat pinjam ikut.
+ */
+export type FeasibilityState = "ok" | "needsBorrow" | "impossible";
+
 export interface ModeFeasibility {
-  /** Bisa membentuk minimal 1 match valid dari pemain menunggu ber-level. */
-  feasible: boolean;
-  /**
-   * Alasan singkat bila tidak feasible (untuk subtext di picker). null bila
-   * feasible atau bila alasannya sekadar "pemain kurang" (ditangani caller).
-   */
+  state: FeasibilityState;
+  /** Alasan singkat (untuk subtext di picker). null bila "ok". */
   hint: string | null;
 }
 
@@ -104,19 +108,39 @@ export function modeFeasibility(
   busyIds: Set<string>,
   mode: MatchMode,
   round: number,
+  /**
+   * Kandidat pemain SEDANG MAIN yang boleh dipinjam (Poin D). Bila diberikan,
+   * feasibility ikut mempertimbangkan skenario pinjam sebelum menyerah —
+   * supaya badge konsisten dengan autofill yang memang bisa meminjam.
+   */
+  reservable: SessionPlayer[] = [],
 ): ModeFeasibility {
-  const pool = availablePool(players, { requireLevel: true, excludeIds: busyIds });
+  const history = MatchHistory.fromMatches([]); // riwayat tak relevan untuk feasibility
+  const waiting = availablePool(players, {
+    requireLevel: true,
+    excludeIds: busyIds,
+  });
 
-  if (pool.length < 4) {
-    return { feasible: false, hint: null }; // "pemain kurang" ditangani caller
+  // 1. Bisa dari pemain menunggu saja?
+  if (
+    waiting.length >= 4 &&
+    generateMatch(waiting, history, round, undefined, mode)
+  ) {
+    return { state: "ok", hint: null };
   }
 
-  const history = MatchHistory.fromMatches([]); // riwayat tak relevan untuk feasibility
-  const prop = generateMatch(pool, history, round, undefined, mode);
-  if (prop) return { feasible: true, hint: null };
+  // 2. Bisa bila meminjam pemain yang sedang main? (Poin D)
+  // reservable berisi pemain yang sedang main (busy) tapi layak dipinjam.
+  const withBorrow = [...waiting, ...reservable.filter((p) => p.level !== null)];
+  if (
+    withBorrow.length >= 4 &&
+    generateMatch(withBorrow, history, round, undefined, mode)
+  ) {
+    return { state: "needsBorrow", hint: hintForMode(waiting, mode) };
+  }
 
-  // Tidak ada kombinasi valid → susun hint spesifik per mode dari komposisi pool.
-  return { feasible: false, hint: hintForMode(pool, mode) };
+  // 3. Tak bisa walau dipinjam.
+  return { state: "impossible", hint: hintForMode(waiting, mode) };
 }
 
 /** Hitung feasibility untuk semua mode sekaligus. */
@@ -125,9 +149,11 @@ export function feasibilityForModes(
   busyIds: Set<string>,
   modes: readonly MatchMode[],
   round: number,
+  reservable: SessionPlayer[] = [],
 ): Record<MatchMode, ModeFeasibility> {
   const out = {} as Record<MatchMode, ModeFeasibility>;
-  for (const m of modes) out[m] = modeFeasibility(players, busyIds, m, round);
+  for (const m of modes)
+    out[m] = modeFeasibility(players, busyIds, m, round, reservable);
   return out;
 }
 

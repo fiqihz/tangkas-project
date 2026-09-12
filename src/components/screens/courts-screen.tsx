@@ -141,6 +141,10 @@ export function CourtsScreen() {
     // eslint-disable-next-line react-hooks/exhaustive-deps
     [players, busyKey],
   );
+  // Kandidat pinjam (sedang main, ber-level) — supaya badge feasibility ikut
+  // memperhitungkan skenario Poin D (pinjam pemain), konsisten dgn autofill.
+  const reservable = reservableCandidates();
+  const reservableKey = reservable.map((p) => p.id).sort().join(",");
   const feasibility = useMemo(
     () =>
       feasibilityForModes(
@@ -148,9 +152,10 @@ export function CourtsScreen() {
         busy,
         MODE_OPTIONS.map((m) => m.value),
         round,
+        reservable,
       ),
     // eslint-disable-next-line react-hooks/exhaustive-deps
-    [players, busyKey, round],
+    [players, busyKey, round, reservableKey],
   );
 
   return (
@@ -1029,10 +1034,14 @@ function ModePickerSheet({
 
           {MODE_OPTIONS.map((m) => {
             const feas = feasibility[m.value];
-            // Tetap bisa ditekan walau belum feasible (host mungkin mau lihat
-            // pesan lengkap / mengubah pemain dulu), tapi tampil redup + badge
-            // supaya ekspektasi jelas di depan — bukan gagal setelah ditekan.
-            const unavailable = feas && !feas.feasible;
+            const state = feas?.state ?? "ok";
+            // 3 keadaan:
+            //  - ok          : normal, tanpa badge.
+            //  - needsBorrow : bisa TAPI perlu pinjam pemain (Poin D). Tetap
+            //    dipilih; saat diklik akan muncul sheet konfirmasi pinjam.
+            //  - impossible  : tak bisa walau dipinjam. Tampil redup + "belum bisa".
+            const needsBorrow = state === "needsBorrow";
+            const impossible = state === "impossible";
             return (
               <button
                 key={m.value}
@@ -1042,21 +1051,28 @@ function ModePickerSheet({
                 }}
                 className={cn(
                   "flex select-none items-start gap-3 rounded-xl border border-border px-3.5 py-3 text-left transition-all active:scale-[0.99] active:bg-secondary",
-                  unavailable ? "bg-secondary/20 opacity-60" : "bg-secondary/40",
+                  impossible ? "bg-secondary/20 opacity-60" : "bg-secondary/40",
                 )}
               >
                 <span className="text-xl leading-none">{m.emoji}</span>
                 <span className="flex min-w-0 flex-col gap-0.5">
                   <span className="flex items-center gap-1.5 font-semibold">
                     {t(m.labelKey)}
-                    {unavailable && (
+                    {needsBorrow && (
+                      <span className="shrink-0 rounded bg-sky-500/15 px-1.5 py-0.5 text-[10px] font-medium text-sky-600 dark:text-sky-400">
+                        {t("mode.needsBorrow")}
+                      </span>
+                    )}
+                    {impossible && (
                       <span className="shrink-0 rounded bg-amber-500/15 px-1.5 py-0.5 text-[10px] font-medium text-amber-600 dark:text-amber-400">
-                        belum bisa
+                        {t("mode.unavailable")}
                       </span>
                     )}
                   </span>
                   <span className="text-xs text-muted-foreground">
-                    {unavailable && feas.hint ? feas.hint : t(m.descKey)}
+                    {(needsBorrow || impossible) && feas?.hint
+                      ? feas.hint
+                      : t(m.descKey)}
                   </span>
                 </span>
               </button>
