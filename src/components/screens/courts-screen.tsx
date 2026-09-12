@@ -38,6 +38,7 @@ import {
   summarizeWaiting,
   type ModeFeasibility,
 } from "@/lib/domain/pool-insight";
+import { planCompositionReserve } from "@/lib/domain/reserve-plan";
 import type { DictKey } from "@/lib/i18n/dict";
 import { haptic } from "@/lib/haptics";
 import { cn } from "@/lib/utils";
@@ -62,6 +63,7 @@ export function CourtsScreen() {
     setPlayerLevel,
     setPlayerGender,
     busyPlayerIds,
+    reservableCandidates,
     session,
   } = useSessionStore();
   const t = useT();
@@ -72,6 +74,12 @@ export function CourtsScreen() {
   const [modeForCourt, setModeForCourt] = useState<string | null>(null);
   // Match yang butuh lengkapi level/gender dulu sebelum Finish (null = tak ada).
   const [completeInfoFor, setCompleteInfoFor] = useState<Match | null>(null);
+  // Poin D: konfirmasi pinjam pemain dari lapangan lain (null = tak ada).
+  const [reserveConfirm, setReserveConfirm] = useState<{
+    courtId: string;
+    mode: MatchMode;
+    borrow: SessionPlayer[];
+  } | null>(null);
 
   const [finishFor, setFinishFor] = useState<Match | null>(null);
   const [manualFor, setManualFor] = useState<string | null>(null);
@@ -350,9 +358,27 @@ export function CourtsScreen() {
             const courtId = modeForCourt;
             setModeForCourt(null);
             const res = await generateLockedPreview(courtId, mode);
-            if (!res.ok)
+            if (res.ok) {
+              setAutoFillMsg(null);
+              return;
+            }
+            // Poin D: gagal menyusun dari pemain menunggu. Coba rencana pinjam
+            // pemain dari lapangan lain — bila ada, minta konfirmasi host dulu
+            // (opt-in). Bila tak ada solusi, tampilkan pesan error seperti biasa.
+            const waitingLeveled = players.filter(
+              (p) => p.status === "active" && p.level !== null && !busy.has(p.id),
+            );
+            const plan = planCompositionReserve(
+              waitingLeveled,
+              reservableCandidates(),
+              mode,
+              round,
+            );
+            if (plan && plan.borrow.length > 0) {
+              setReserveConfirm({ courtId, mode, borrow: plan.borrow });
+            } else {
               setAutoFillMsg(res.reason ?? "Gagal menyusun preview.");
-            else setAutoFillMsg(null);
+            }
           }}
           onPickFirstMatch={async () => {
             // Hanya dipanggil saat eligible (sheet menahan kasus tidak eligible
@@ -362,6 +388,24 @@ export function CourtsScreen() {
             const res = await generateFirstMatch(courtId);
             if (!res.ok)
               setAutoFillMsg(res.reason ?? "Gagal menyusun match pertama.");
+            else setAutoFillMsg(null);
+          }}
+        />
+      )}
+      {reserveConfirm && (
+        <ReserveConfirmSheet
+          borrow={reserveConfirm.borrow}
+          onClose={() => setReserveConfirm(null)}
+          onConfirm={async () => {
+            const { courtId, mode, borrow } = reserveConfirm;
+            setReserveConfirm(null);
+            const res = await generateLockedPreview(
+              courtId,
+              mode,
+              new Set(borrow.map((p) => p.id)),
+            );
+            if (!res.ok)
+              setAutoFillMsg(res.reason ?? "Gagal menyusun preview.");
             else setAutoFillMsg(null);
           }}
         />
@@ -701,6 +745,84 @@ function WaitingPanel({ summary }: { summary: WaitingSummary }) {
         ))}
       </div>
     </div>
+  );
+}
+
+/**
+ * Poin D: sheet konfirmasi meminjam pemain dari lapangan lain. Muncul saat mode
+ * yang dipilih tidak bisa terbentuk dari pemain menunggu, tapi BISA bila pemain
+ * tertentu yang sedang main ikut dipinjam. Pemain tidak dicabut dari match
+ * berjalan — hanya di-booking untuk match berikutnya (mulai setelah match
+ * mereka selesai). Keputusan ada di host.
+ */
+function ReserveConfirmSheet({
+  borrow,
+  onConfirm,
+  onClose,
+}: {
+  borrow: SessionPlayer[];
+  onConfirm: () => void;
+  onClose: () => void;
+}) {
+  const t = useT();
+  const [submitting, setSubmitting] = useState(false);
+
+  return (
+    <Sheet open onOpenChange={(o) => !o && !submitting && onClose()}>
+      <SheetContent>
+        <SheetTitle className="text-lg font-bold">
+          {t("reserve.title")}
+        </SheetTitle>
+        <p className="mt-1 text-sm text-muted-foreground">
+          {t("reserve.body")}
+        </p>
+
+        <div className="mt-4 flex flex-col gap-2">
+          {borrow.map((p) => (
+            <div
+              key={p.id}
+              className="flex items-center gap-2 rounded-xl border border-amber-300 bg-amber-50 px-3 py-2.5 dark:border-amber-900 dark:bg-amber-950/40"
+            >
+              <span className="min-w-0 flex-1 truncate text-sm font-medium">
+                {p.name}
+              </span>
+              <GenderBadge gender={p.gender} />
+              <LevelBadge level={p.level} />
+              <span className="shrink-0 rounded bg-amber-500/15 px-1.5 py-0.5 text-[10px] font-medium text-amber-600 dark:text-amber-400">
+                {t("reserve.playing")}
+              </span>
+            </div>
+          ))}
+        </div>
+
+        <p className="mt-3 text-xs text-muted-foreground">
+          {t("reserve.note")}
+        </p>
+
+        <div className="mt-4 flex gap-2">
+          <Button
+            variant="outline"
+            className="flex-1"
+            onClick={onClose}
+            disabled={submitting}
+          >
+            {t("common.cancel")}
+          </Button>
+          <Button
+            variant="info"
+            className="flex-1"
+            onClick={() => {
+              haptic(15);
+              setSubmitting(true);
+              onConfirm();
+            }}
+            disabled={submitting}
+          >
+            {submitting ? t("reserve.arranging") : t("reserve.confirm")}
+          </Button>
+        </div>
+      </SheetContent>
+    </Sheet>
   );
 }
 

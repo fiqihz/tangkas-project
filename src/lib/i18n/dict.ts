@@ -221,6 +221,23 @@ export const DICT = {
     en: "Pair players of the same level.",
   },
 
+  // Reserve confirm (Poin D — pinjam pemain dari lapangan lain)
+  "reserve.title": {
+    id: "Pinjam pemain dari lapangan lain?",
+    en: "Borrow players from other courts?",
+  },
+  "reserve.body": {
+    id: "Mode ini belum bisa disusun dari pemain yang menunggu. Pinjam pemain berikut untuk match berikutnya:",
+    en: "This mode can't be arranged from waiting players. Borrow the following players for the next match:",
+  },
+  "reserve.playing": { id: "main", en: "playing" },
+  "reserve.note": {
+    id: "Pemain tetap menyelesaikan match yang sedang berjalan dulu. Preview ini baru bisa dimulai setelah match mereka selesai.",
+    en: "These players finish their current match first. This preview can only start after their match ends.",
+  },
+  "reserve.confirm": { id: "Pinjam & susun", en: "Borrow & arrange" },
+  "reserve.arranging": { id: "Menyusun…", en: "Arranging…" },
+
   // Delete court dialog
   "deleteCourt.title": { id: "Hapus {label}?", en: "Delete {label}?" },
   "deleteCourt.playing": {

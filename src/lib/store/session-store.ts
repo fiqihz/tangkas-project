@@ -105,7 +105,19 @@ interface SessionState {
   generateLockedPreview: (
     courtId: string | null,
     mode?: MatchMode,
+    /**
+     * Poin D: id pemain yang SEDANG MAIN yang boleh dipinjam untuk mengisi
+     * pool (opt-in, sudah dikonfirmasi host). Ditambahkan ke pool sebagai
+     * kandidat; tidak dicabut dari match berjalan (booking).
+     */
+    allowReserveIds?: ReadonlySet<string>,
   ) => Promise<{ ok: boolean; reason?: string }>;
+  /**
+   * Poin D: daftar pemain yang SEDANG MAIN & layak dipinjam untuk match
+   * berikutnya (sudah ber-level, active, terurut durasi terlama dulu).
+   * Dipakai UI untuk menyusun rencana pinjaman & konfirmasi.
+   */
+  reservableCandidates: () => SessionPlayer[];
   /**
    * Susun match pertama murni berdasarkan URUTAN CHECK-IN (abaikan level).
    * Hanya untuk awal sesi: berlaku bila belum ada pemain yang main sama sekali
@@ -753,6 +765,14 @@ export const useSessionStore = create<SessionState>((set, get) => ({
     return busy;
   },
 
+  reservableCandidates() {
+    const { matches, players } = get();
+    // Sedang main, active, sudah ber-level, terurut durasi terlama dulu.
+    return reservablePlayingPlayers(matches, players).filter(
+      (p) => p.level !== null,
+    );
+  },
+
   async setManualMatch(courtId, teamA, teamB) {
     const { session, courts } = get();
     if (!session) return;
@@ -836,7 +856,7 @@ export const useSessionStore = create<SessionState>((set, get) => ({
    * saling eksklusif dengan proposed/playing lapangan lain. Tidak menimpa bila
    * sudah ada proposed di lapangan itu.
    */
-  async generateLockedPreview(courtId, mode = "balanced") {
+  async generateLockedPreview(courtId, mode = "balanced", allowReserveIds) {
     const first = get();
     if (!first.session || !courtId) return { ok: false };
 
@@ -878,6 +898,23 @@ export const useSessionStore = create<SessionState>((set, get) => ({
     // WAJIB diprioritaskan masuk match berikutnya — jangan sampai kalah oleh
     // pemain yang di-reserve dari lapangan lain.
     const waitingIds = new Set(pool.map((p) => p.id));
+
+    // Poin D: pemain yang SEDANG MAIN yang di-ACC host untuk dipinjam
+    // (allowReserveIds). Ditambahkan ke pool sebagai kandidat — TIDAK dicabut
+    // dari match berjalan; hanya di-booking (jadi preview "next"). Hanya yang
+    // active & ber-level yang diterima. Ini memungkinkan mode berkomposisi
+    // (ladies/mixed/gendongan/kelas) tetap terbentuk meski pemain yang cocok
+    // sedang main di lapangan lain.
+    if (allowReserveIds && allowReserveIds.size > 0) {
+      const borrowed = players.filter(
+        (p) =>
+          allowReserveIds.has(p.id) &&
+          p.status === "active" &&
+          p.level !== null &&
+          !waitingIds.has(p.id),
+      );
+      if (borrowed.length > 0) pool = [...pool, ...borrowed];
+    }
 
     // Pemain menunggu yang BELUM di-set level (active, non-busy, level null).
     // Mereka "menunggu" tapi belum bisa ikut auto-matchmaking. Kalau ada, JANGAN

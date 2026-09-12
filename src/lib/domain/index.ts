@@ -4,5 +4,6 @@ export * from "./history";
 export * from "./queue";
 export * from "./matchmaking";
 export * from "./pool-insight";
+export * from "./reserve-plan";
 export * from "./leaderboard";
 export * from "./substitute";
