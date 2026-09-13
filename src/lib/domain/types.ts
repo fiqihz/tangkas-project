@@ -90,8 +90,18 @@ export interface Match {
   startedAt?: string | null;
   /** Waktu match selesai (ISO) — di-set saat Finish. null bila belum. */
   finishedAt?: string | null;
-  /** Skor akhir (null bila belum di-Finish). */
+  /**
+   * Skor agregat akhir (total poin semua set; null bila belum di-Finish).
+   * Untuk match multi-set, ini = penjumlahan seluruh set. Dipakai leaderboard
+   * & statistik (skema poin existing).
+   */
   score: { a: number; b: number } | null;
+  /**
+   * Skor per set, terurut set 1..n. Kosong/undefined untuk match lama (pre
+   * multi-set) atau match Best of 1 yang diselesaikan sebelum fitur ini — pada
+   * kasus itu `score` (agregat) tetap jadi sumber tampilan.
+   */
+  sets?: { a: number; b: number }[];
   /** Pemenang: "a" | "b" | "draw" | null (belum selesai). */
   winner: "a" | "b" | "draw" | null;
   /** Poin 5: jumlah kok yang dipakai di match ini (per biji). 0 bila tak dicatat. */

@@ -49,6 +49,9 @@ export function LeaderboardScreen() {
                 <th className="px-1.5 py-2 text-left">{t("leaderboard.colPlayer")}</th>
                 <th className="px-1.5 py-2 text-center">M</th>
                 <th className="px-1.5 py-2 text-center">K</th>
+                <th className="px-1.5 py-2 text-center" title={t("leaderboard.drawTitle")}>
+                  S
+                </th>
                 <th className="px-1.5 py-2 text-center" title={t("leaderboard.winRate")}>
                   WR
                 </th>
@@ -91,6 +94,9 @@ export function LeaderboardScreen() {
                   <td className="px-1.5 py-2 font-medium">{r.name}</td>
                   <td className="px-1.5 py-2 text-center">{r.wins}</td>
                   <td className="px-1.5 py-2 text-center">{r.losses}</td>
+                  <td className="px-1.5 py-2 text-center text-muted-foreground">
+                    {r.draws}
+                  </td>
                   <td className="px-1.5 py-2 text-center text-muted-foreground">
                     {r.winRate}%
                   </td>

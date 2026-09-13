@@ -51,6 +51,8 @@ create table if not exists session (
   status        text not null default 'ongoing'
                 check (status in ('scheduled','ongoing','finished')),
   current_round int not null default 0,
+  -- Format jumlah set per match (Best of 1/2/3). Default 1 (single set).
+  sets_target   int not null default 1 check (sets_target in (1,2,3)),
   scheduled_at  timestamptz,
   created_at    timestamptz not null default now(),
   finished_at   timestamptz
@@ -120,6 +122,24 @@ create index if not exists idx_match_session on match(session_id);
 create index if not exists idx_match_court on match(court_id);
 
 -- ----------------------------------------------------------------------------
+-- 6b. MATCH SET (skor per set — mendukung Best of 1/2/3)
+-- ----------------------------------------------------------------------------
+-- Satu baris per set. match.score_a/score_b/winner tetap dipakai sebagai
+-- AGREGAT (total poin semua set + pemenang akhir) agar konsumen lama tak
+-- berubah. RPC finish_set_atomic & edit_match_sets_atomic (lihat migration
+-- 018) yang mengelola tabel ini + agregat + statistik pemain secara atomik.
+create table if not exists match_set (
+  id         uuid primary key default gen_random_uuid(),
+  match_id   uuid not null references match(id) on delete cascade,
+  set_no     int not null check (set_no >= 1),
+  score_a    int not null check (score_a >= 0),
+  score_b    int not null check (score_b >= 0),
+  created_at timestamptz not null default now(),
+  unique (match_id, set_no)
+);
+create index if not exists idx_match_set_match on match_set(match_id);
+
+-- ----------------------------------------------------------------------------
 -- 7. ROW LEVEL SECURITY
 -- ----------------------------------------------------------------------------
 -- Opsi B: app digembok 1 password di sisi client, akses DB pakai anon key.
@@ -137,12 +157,13 @@ alter table session        enable row level security;
 alter table session_player enable row level security;
 alter table court          enable row level security;
 alter table match          enable row level security;
+alter table match_set      enable row level security;
 
 -- Helper: buat policy "allow all untuk anon & authenticated" per tabel.
 do $$
 declare t text;
 begin
-  foreach t in array array['community','player_profile','session','session_player','court','match']
+  foreach t in array array['community','player_profile','session','session_player','court','match','match_set']
   loop
     execute format('drop policy if exists %I on %I;', t || '_all', t);
     execute format(
@@ -175,6 +196,10 @@ begin
     alter publication supabase_realtime add table session;
   exception when others then null;
   end;
+  begin
+    alter publication supabase_realtime add table match_set;
+  exception when others then null;
+  end;
 end $$;
 
 -- REPLICA IDENTITY FULL: wajib agar langganan realtime BERFILTER
@@ -185,3 +210,4 @@ alter table match          replica identity full;
 alter table session_player replica identity full;
 alter table court          replica identity full;
 alter table session        replica identity full;
+alter table match_set      replica identity full;

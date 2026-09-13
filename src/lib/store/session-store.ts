@@ -60,6 +60,8 @@ interface SessionState {
     scheduledAt?: string | null;
     courtLabels?: string[];
     trackShuttlecocks?: boolean;
+    /** Format jumlah set per match (Best of 1/2/3). Default 1. */
+    setsTarget?: number;
     open?: boolean;
   }) => Promise<DbSession | null>;
   startSession: (sessionId: string) => Promise<void>;
@@ -140,21 +142,34 @@ interface SessionState {
     matchId: string,
     playerId: string,
   ) => Promise<{ ok: boolean; reason?: string }>;
-  finishMatch: (
+  /**
+   * Catat SATU set match. Pemenang set & agregat match dihitung di DB (RPC
+   * finish_set_atomic). Bila match belum diputus (format multi-set), match
+   * tetap 'playing' — host melanjutkan set berikutnya. Bila diputus, match jadi
+   * 'finished' + statistik pemain ter-update. Menolak set imbang.
+   */
+  finishSet: (
     matchId: string,
     scoreA: number,
     scoreB: number,
-    winner: "a" | "b" | "draw",
     shuttlecocks?: number,
-  ) => Promise<void>;
+  ) => Promise<{ ok: boolean; reason?: string }>;
   /** Poin 5: set status bayar (lunas/belum) seorang pemain. */
   setPlayerPaid: (playerId: string, paid: boolean) => Promise<void>;
-  editMatchScore: (
+  /**
+   * Koreksi seluruh skor per-set match yang sudah selesai. `sets` terurut set
+   * 1..n; tiap set harus punya pemenang. Agregat & statistik dihitung ulang di
+   * DB (RPC edit_match_sets_atomic).
+   */
+  editMatchSets: (
     matchId: string,
-    scoreA: number,
-    scoreB: number,
-    winner: "a" | "b" | "draw",
+    sets: { a: number; b: number }[],
   ) => Promise<{ ok: boolean; reason?: string }>;
+  /**
+   * Nomor set yang sedang berlangsung untuk sebuah match (1-based) & target.
+   * Dipakai UI untuk judul "Selesai Set N" dan ringkasan progres.
+   */
+  setProgress: (matchId: string) => { current: number; target: number; setsWonA: number; setsWonB: number };
   substituteInProposed: (
     matchId: string,
     leavingId: string,
@@ -307,16 +322,17 @@ export const useSessionStore = create<SessionState>((set, get) => ({
         set({ loading: false, error: "Sesi tidak ditemukan." });
         return;
       }
-      const [courts, players, matches] = await Promise.all([
+      const [courts, players, matches, matchSets] = await Promise.all([
         repo.listCourts(session.id),
         repo.listSessionPlayers(session.id),
         repo.listMatches(session.id),
+        repo.listMatchSets(session.id),
       ]);
       set({
         session,
         courts,
         players: players.map(toSessionPlayer),
-        matches: matches.map(toMatch),
+        matches: matches.map((m) => toMatch(m, matchSets)),
         profileIdOf: Object.fromEntries(players.map((p) => [p.id, p.profile_id])),
         loading: false,
       });
@@ -367,13 +383,14 @@ export const useSessionStore = create<SessionState>((set, get) => ({
   async refresh() {
     const { session } = get();
     if (!session) return;
-    const [fresh, courts, players, matches] = await Promise.all([
+    const [fresh, courts, players, matches, matchSets] = await Promise.all([
       // Muat ulang baris session juga agar counter (current_round, courts,
       // status) ikut sinkron di device pengamat saat realtime memicu refresh.
       repo.getSession(session.id),
       repo.listCourts(session.id),
       repo.listSessionPlayers(session.id),
       repo.listMatches(session.id),
+      repo.listMatchSets(session.id),
     ]);
     set({
       // Pertahankan session lama bila fetch mengembalikan null (mis. terhapus)
@@ -381,7 +398,7 @@ export const useSessionStore = create<SessionState>((set, get) => ({
       session: fresh ?? session,
       courts,
       players: players.map(toSessionPlayer),
-      matches: matches.map(toMatch),
+      matches: matches.map((m) => toMatch(m, matchSets)),
       profileIdOf: Object.fromEntries(players.map((p) => [p.id, p.profile_id])),
     });
   },
@@ -413,6 +430,7 @@ export const useSessionStore = create<SessionState>((set, get) => ({
         scheduledAt: opts.scheduledAt ?? null,
         courtLabels: opts.courtLabels,
         trackShuttlecocks: opts.trackShuttlecocks ?? false,
+        setsTarget: opts.setsTarget ?? 1,
         communityId,
       });
       await get().loadSessions();
@@ -1220,33 +1238,63 @@ export const useSessionStore = create<SessionState>((set, get) => ({
     }
   },
 
-  async finishMatch(matchId, scoreA, scoreB, winner, shuttlecocks = 0) {
-    const { matches, players, session } = get();
-    if (!session) return;
+  setProgress(matchId) {
+    const { matches, session } = get();
+    const target = Math.min(3, Math.max(1, session?.sets_target ?? 1));
     const match = matches.find((m) => m.id === matchId);
-    if (!match) return;
+    const sets = match?.sets ?? [];
+    let setsWonA = 0;
+    let setsWonB = 0;
+    for (const s of sets) {
+      if (s.a > s.b) setsWonA += 1;
+      else if (s.b > s.a) setsWonB += 1;
+    }
+    // Set yang sedang berlangsung = jumlah set tercatat + 1 (dibatasi target).
+    const current = Math.min(target, sets.length + 1);
+    return { current, target, setsWonA, setsWonB };
+  },
 
-    try {
-      // Atomik: match di-set finished + statistik 4 pemain di-update dalam 1
-      // transaksi DB (server-side), kebal terhadap kegagalan sebagian & race
-      // multi-device. Menggantikan pola lama (update match lalu Promise.all
-      // updateSessionPlayer) yang bisa korup bila gagal di tengah.
-      void players; // stats dihitung di DB; snapshot lokal tak lagi dipakai
-      await repo.finishMatchAtomic(matchId, scoreA, scoreB, winner, shuttlecocks);
-    } catch (e) {
-      set({ actionError: `Gagal menyimpan skor: ${describe(e)}. Coba lagi.` });
+  async finishSet(matchId, scoreA, scoreB, shuttlecocks = 0) {
+    const { matches, session } = get();
+    if (!session) return { ok: false, reason: "Tidak ada sesi." };
+    const match = matches.find((m) => m.id === matchId);
+    if (!match) return { ok: false, reason: "Match tidak ditemukan." };
+
+    // Guard klien: satu set harus ada pemenang (RPC juga menolak, ini demi UX).
+    if (scoreA === scoreB) {
+      return { ok: false, reason: "Satu set tidak boleh imbang." };
     }
 
+    // Cegah dobel-submit set yang sama (dobel-tap di HP laggy).
+    const key = `finishSet:${matchId}`;
+    if (inFlight.has(key)) return { ok: false, reason: "Sedang diproses." };
+    inFlight.add(key);
+    try {
+      // Atomik: catat set + (bila match diputus) finalisasi match + statistik
+      // 4 pemain, semua di DB. Pemenang set/match & agregat dihitung server-side.
+      await repo.finishSetAtomic(matchId, scoreA, scoreB, shuttlecocks);
+    } catch (e) {
+      set({ actionError: `Gagal menyimpan skor set: ${describe(e)}. Coba lagi.` });
+      inFlight.delete(key);
+      // Tetap refresh agar UI sinkron dengan kondisi DB terkini.
+      try {
+        await get().refresh();
+      } catch {
+        // biarkan; error utama sudah dilaporkan
+      }
+      return { ok: false, reason: describe(e) };
+    }
+    inFlight.delete(key);
+
     // Preview yang sudah di-lock (proposed) di lapangan ini otomatis "naik"
-    // jadi match berikutnya. Preview baru TIDAK di-generate otomatis — host
-    // menekan tombol "Auto-fill" per lapangan untuk menyusunnya.
-    // refresh() tetap dijalankan agar UI sinkron dengan kondisi DB terkini,
-    // baik saat sukses maupun setelah gagal sebagian.
+    // jadi match berikutnya BILA match selesai. Bila match masih 'playing'
+    // (set berikutnya belum dimainkan), preview tetap menunggu di belakang.
     try {
       await get().refresh();
     } catch (e) {
       set({ actionError: `Gagal memuat data terbaru: ${describe(e)}.` });
     }
+    return { ok: true };
   },
 
   async restProposedPlayer(matchId, playerId) {
@@ -1394,60 +1442,34 @@ export const useSessionStore = create<SessionState>((set, get) => ({
     return { ok: true };
   },
 
-  async editMatchScore(matchId, scoreA, scoreB, winner) {
-    const { matches, players } = get();
+  async editMatchSets(matchId, sets) {
+    const { matches } = get();
     const match = matches.find((m) => m.id === matchId);
-    if (!match || match.state !== "finished" || !match.score || !match.winner) {
+    if (!match || match.state !== "finished") {
       return { ok: false, reason: "Match belum selesai / tidak bisa diedit." };
     }
+    if (sets.length === 0) {
+      return { ok: false, reason: "Minimal satu set." };
+    }
+    // Guard klien: tiap set harus ada pemenang (RPC juga menolak, demi UX).
+    if (sets.some((s) => s.a === s.b)) {
+      return { ok: false, reason: "Setiap set harus ada pemenang (tidak boleh imbang)." };
+    }
 
-    const oldScore = match.score;
-    const oldWinner = match.winner;
-    const teamA = new Set(match.teamA.playerIds);
-    const teamB = new Set(match.teamB.playerIds);
-    const involved = [...match.teamA.playerIds, ...match.teamB.playerIds];
-    const map = byIdMap(players);
-
-    // Hitung delta per pemain: (statistik baru) - (statistik lama), lalu terapkan.
-    const statFor = (
-      inA: boolean,
-      sA: number,
-      sB: number,
-      w: "a" | "b" | "draw",
-    ) => {
-      const scored = inA ? sA : sB;
-      const conceded = inA ? sB : sA;
-      const won = (inA && w === "a") || (!inA && w === "b");
-      const lost = (inA && w === "b") || (!inA && w === "a");
-      const drew = w === "draw";
-      return {
-        wins: won ? 1 : 0,
-        losses: lost ? 1 : 0,
-        draws: drew ? 1 : 0,
-        scored,
-        conceded,
-      };
-    };
-
-    await repo.finishMatch(matchId, scoreA, scoreB, winner);
-
-    await Promise.all(
-      involved.map((id) => {
-        const p = map.get(id);
-        if (!p) return Promise.resolve();
-        const isInA = teamA.has(id);
-        void teamB;
-        const oldS = statFor(isInA, oldScore.a, oldScore.b, oldWinner);
-        const newS = statFor(isInA, scoreA, scoreB, winner);
-        return repo.updateSessionPlayer(id, {
-          wins: p.wins - oldS.wins + newS.wins,
-          losses: p.losses - oldS.losses + newS.losses,
-          draws: p.draws - oldS.draws + newS.draws,
-          points_scored: p.pointsScored - oldS.scored + newS.scored,
-          points_conceded: p.pointsConceded - oldS.conceded + newS.conceded,
-        });
-      }),
-    );
+    try {
+      // Atomik di DB: ganti seluruh match_set + recompute agregat match +
+      // selisih (delta) statistik pemain dalam satu transaksi.
+      await repo.editMatchSetsAtomic(matchId, sets);
+    } catch (e) {
+      const reason = `Gagal menyimpan skor: ${describe(e)}.`;
+      set({ actionError: reason });
+      try {
+        await get().refresh();
+      } catch {
+        // biarkan; error utama sudah dilaporkan
+      }
+      return { ok: false, reason };
+    }
 
     await get().refresh();
     return { ok: true };

@@ -29,6 +29,11 @@ export interface DbSession {
   courts: number;
   status: SessionStatus;
   current_round: number;
+  /**
+   * Format jumlah set per match: Best of 1 / 2 / 3. Default 1 (single set).
+   * Mabar lama (sebelum fitur multi-set) terbaca sebagai 1.
+   */
+  sets_target: number;
   scheduled_at: string | null;
   created_at: string;
   finished_at: string | null;
@@ -85,6 +90,16 @@ export interface DbMatch {
   created_at: string;
   started_at: string | null;
   finished_at: string | null;
+}
+
+/** Baris skor satu set dari sebuah match (mendukung Best of 1/2/3). */
+export interface DbMatchSet {
+  id: string;
+  match_id: string;
+  set_no: number;
+  score_a: number;
+  score_b: number;
+  created_at: string;
 }
 
 // ============================================================================

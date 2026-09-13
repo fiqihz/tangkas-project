@@ -28,6 +28,7 @@ export function CreateSessionDialog({ onClose }: { onClose: () => void }) {
   const [labels, setLabels] = useState<string[]>(["", "", ""]);
   const [scheduledAt, setScheduledAt] = useState("");
   const [trackShuttlecocks, setTrackShuttlecocks] = useState(false);
+  const [setsTarget, setSetsTarget] = useState(1);
   const [submitting, setSubmitting] = useState(false);
 
   const setCourtCount = (n: number) => {
@@ -53,6 +54,7 @@ export function CreateSessionDialog({ onClose }: { onClose: () => void }) {
           : null,
       courtLabels: labels,
       trackShuttlecocks,
+      setsTarget,
       open: status === "ongoing",
     });
     setSubmitting(false);
@@ -153,6 +155,33 @@ export function CreateSessionDialog({ onClose }: { onClose: () => void }) {
               }}
               label={t("createSession.trackShuttlecocks")}
             />
+          </div>
+
+          <div>
+            <label className="mb-1 block text-sm font-medium">
+              {t("createSession.setsFormat")}
+            </label>
+            <div className="grid grid-cols-3 gap-2">
+              {[1, 2, 3].map((n) => (
+                <Button
+                  key={n}
+                  type="button"
+                  variant={setsTarget === n ? "default" : "outline"}
+                  onClick={() => {
+                    haptic(8);
+                    setSetsTarget(n);
+                  }}
+                  aria-pressed={setsTarget === n}
+                >
+                  {n === 1
+                    ? t("createSession.oneSet")
+                    : t("createSession.bestOf", { n })}
+                </Button>
+              ))}
+            </div>
+            <p className="mt-1 text-xs text-muted-foreground">
+              {t("createSession.setsFormatDesc")}
+            </p>
           </div>
 
           {error && <p className="text-sm text-destructive">{error}</p>}

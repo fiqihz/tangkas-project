@@ -115,6 +115,9 @@ function MatchHistoryRow({
   const unfinished = match.state === "unfinished";
   const aWon = match.winner === "a";
   const bWon = match.winner === "b";
+  // Punya rincian per-set? (match multi-set atau Best of 1 yang tercatat via
+  // match_set). Bila ya, tampilkan skor per set alih-alih total agregat.
+  const hasSets = (match.sets?.length ?? 0) > 0;
   const duration = formatMatchDuration(match.startedAt, match.finishedAt);
 
   return (
@@ -161,15 +164,44 @@ function MatchHistoryRow({
         <div className="shrink-0 px-1 text-center">
           {unfinished ? (
             <span className="text-xs text-muted-foreground">—</span>
+          ) : hasSets ? (
+            // Match dengan rincian set: tampilkan SKOR PER SET (bukan total
+            // agregat — total gabungan tak lazim di badminton). Skor per set
+            // jadi tampilan utama; tim pemenang tiap set ditebalkan.
+            <div className="flex flex-col items-center gap-0.5">
+              {match.sets!.map((s, i) => (
+                <div
+                  key={i}
+                  className="flex items-center gap-1 font-bold tabular-nums"
+                >
+                  <span className={cn(s.a > s.b && "text-primary")}>{s.a}</span>
+                  <span className="text-muted-foreground">-</span>
+                  <span className={cn(s.b > s.a && "text-primary")}>{s.b}</span>
+                </div>
+              ))}
+              {match.winner === "draw" && (
+                <span className="rounded bg-amber-100 px-1.5 text-[10px] font-medium text-amber-700 dark:bg-amber-900/40 dark:text-amber-300">
+                  {t("history.draw")}
+                </span>
+              )}
+            </div>
           ) : (
-            <div className="flex items-center gap-1 font-bold">
-              <span className={cn(aWon && "text-primary")}>
-                {match.score?.a}
-              </span>
-              <span className="text-muted-foreground">-</span>
-              <span className={cn(bWon && "text-primary")}>
-                {match.score?.b}
-              </span>
+            // Fallback: match lama / Best of 1 tanpa baris set -> skor tunggal.
+            <div className="flex flex-col items-center gap-0.5">
+              <div className="flex items-center gap-1 font-bold">
+                <span className={cn(aWon && "text-primary")}>
+                  {match.score?.a}
+                </span>
+                <span className="text-muted-foreground">-</span>
+                <span className={cn(bWon && "text-primary")}>
+                  {match.score?.b}
+                </span>
+              </div>
+              {match.winner === "draw" && (
+                <span className="rounded bg-amber-100 px-1.5 text-[10px] font-medium text-amber-700 dark:bg-amber-900/40 dark:text-amber-300">
+                  {t("history.draw")}
+                </span>
+              )}
             </div>
           )}
         </div>

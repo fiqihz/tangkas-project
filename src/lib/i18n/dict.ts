@@ -62,6 +62,8 @@ export const DICT = {
   "courts.matchNo": { id: "Match ke-{n}", en: "Match #{n}" },
   "courts.notStarted": { id: "belum mulai", en: "not started" },
   "courts.running": { id: "sedang berjalan", en: "in progress" },
+  "courts.setBadge": { id: "Set {s}/{n}", en: "Set {s}/{n}" },
+  "courts.finishSet": { id: "Selesai Set", en: "Finish Set" },
   "courts.teamA": { id: "Tim A", en: "Team A" },
   "courts.teamB": { id: "Tim B", en: "Team B" },
   "courts.firstMatch": {
@@ -128,6 +130,8 @@ export const DICT = {
   },
   "history.unfinished": { id: "tidak selesai", en: "unfinished" },
   "history.editScore": { id: "Edit skor", en: "Edit score" },
+  "history.draw": { id: "Seri", en: "Draw" },
+  "history.setsLabel": { id: "Set: {sets}", en: "Sets: {sets}" },
 
   // Leaderboard / Livescore
   "leaderboard.title": { id: "Livescore", en: "Livescore" },
@@ -138,6 +142,7 @@ export const DICT = {
   "leaderboard.emptyTitle": { id: "Papan skor menunggu", en: "Scoreboard awaits" },
   "leaderboard.empty": { id: "Belum ada hasil match.", en: "No match results yet." },
   "leaderboard.colPlayer": { id: "Pemain", en: "Player" },
+  "leaderboard.drawTitle": { id: "Seri (draw)", en: "Draws" },
   "leaderboard.winRate": { id: "Win rate", en: "Win rate" },
   "leaderboard.cockTitle": {
     id: "Total kok yang dipakai pemain ini",
@@ -389,6 +394,13 @@ export const DICT = {
   "createSession.startNow": { id: "Mulai Sekarang 🏸", en: "Start Now 🏸" },
   "createSession.scheduleBtn": { id: "Simpan sebagai Jadwal", en: "Save as Schedule" },
   "createSession.creating": { id: "Membuat…", en: "Creating…" },
+  "createSession.setsFormat": { id: "Format set per match", en: "Sets per match" },
+  "createSession.setsFormatDesc": {
+    id: "Berapa set tiap match. Best of 2/3 = pemenang ditentukan mayoritas set.",
+    en: "How many sets each match has. Best of 2/3 = winner decided by set majority.",
+  },
+  "createSession.bestOf": { id: "Best of {n}", en: "Best of {n}" },
+  "createSession.oneSet": { id: "1 set", en: "1 set" },
 
   // Finish match (score) dialog
   "finishMatch.title": { id: "Input Skor · Match ke-{n}", en: "Enter Score · Match #{n}" },
@@ -405,6 +417,20 @@ export const DICT = {
   "finishMatch.save": { id: "Simpan", en: "Save" },
   "finishMatch.shuttlecocks": { id: "Kok kepakai", en: "Shuttlecocks used" },
   "finishMatch.shuttlecocksHint": { id: "per biji (opsional)", en: "per piece (optional)" },
+  // Multi-set (Best of 2/3)
+  "finishMatch.setTitle": { id: "Skor Set {s} · Match ke-{n}", en: "Set {s} Score · Match #{n}" },
+  "finishMatch.setSubtitle": {
+    id: "Isi skor set ini. Bila match belum selesai, lanjut ke set berikutnya.",
+    en: "Enter this set's score. If the match isn't over, continue to the next set.",
+  },
+  "finishMatch.setTie": {
+    id: "Satu set tidak boleh imbang — harus ada pemenang.",
+    en: "A set can't be tied — there must be a winner.",
+  },
+  "finishMatch.setWinner": { id: "Set ini: {name}", en: "This set: {name}" },
+  "finishMatch.setProgress": { id: "Set menang — {a} : {b}", en: "Sets won — {a} : {b}" },
+  "finishMatch.saveSet": { id: "Simpan Set", en: "Save Set" },
+  "finishMatch.bestOf": { id: "Best of {n}", en: "Best of {n}" },
 
   // Edit score dialog
   "editScore.title": { id: "Edit Skor", en: "Edit Score" },
@@ -413,6 +439,11 @@ export const DICT = {
     en: "Stats & leaderboard are recalculated automatically.",
   },
   "editScore.failed": { id: "Gagal menyimpan.", en: "Failed to save." },
+  "editScore.setLabel": { id: "Set {s}", en: "Set {s}" },
+  "editScore.setTie": {
+    id: "Set {s} tidak boleh imbang.",
+    en: "Set {s} can't be tied.",
+  },
 
   // Level badge
   "level.notSet": { id: "belum di-set", en: "not set" },

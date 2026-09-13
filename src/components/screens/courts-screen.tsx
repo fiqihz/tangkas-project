@@ -558,13 +558,23 @@ function MatchView({
   onTapPlayer: (playerId: string) => void;
 }) {
   const t = useT();
+  const session = useSessionStore((s) => s.session);
+  const setsTarget = Math.min(3, Math.max(1, session?.sets_target ?? 1));
+  const isMultiSet = setsTarget > 1;
   const isProposed = match.state === "proposed";
+  const playedSets = match.sets ?? [];
+  const currentSetNo = Math.min(setsTarget, playedSets.length + 1);
   return (
     <div className="flex flex-col gap-3">
-      <div className="flex items-center gap-1.5 text-xs font-medium">
+      <div className="flex flex-wrap items-center gap-1.5 text-xs font-medium">
         <span className="rounded-md bg-primary/10 px-2 py-0.5 text-primary">
           {t("courts.matchNo", { n: matchNumber })}
         </span>
+        {isMultiSet && !isProposed && (
+          <span className="rounded-md bg-secondary px-2 py-0.5">
+            {t("courts.setBadge", { s: currentSetNo, n: setsTarget })}
+          </span>
+        )}
         <span
           className={
             isProposed ? "text-amber-600" : "text-muted-foreground"
@@ -576,6 +586,19 @@ function MatchView({
           <MatchTimer startedAt={match.startedAt} />
         )}
       </div>
+
+      {isMultiSet && playedSets.length > 0 && (
+        <div className="flex flex-wrap gap-1.5">
+          {playedSets.map((s, i) => (
+            <span
+              key={i}
+              className="rounded-md border border-border bg-secondary/40 px-2 py-0.5 text-xs font-semibold tabular-nums"
+            >
+              {s.a}–{s.b}
+            </span>
+          ))}
+        </div>
+      )}
       <div className="flex items-stretch gap-2">
         <TeamBlock
           ids={match.teamA.playerIds}
@@ -608,7 +631,7 @@ function MatchView({
             {hasPreview ? t("courts.regenerate") : t("courts.smartMatchmaking")}
           </Button>
           <Button variant="warning" className="flex-1" onClick={onFinish}>
-            {t("courts.finishScore")}
+            {isMultiSet ? t("courts.finishSet") : t("courts.finishScore")}
           </Button>
         </div>
       )}

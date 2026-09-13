@@ -13,6 +13,7 @@ import {
   type DbCourt,
   type DbInvite,
   type DbMatch,
+  type DbMatchSet,
   type DbPlayerProfile,
   type DbSession,
   type DbSessionPlayer,
@@ -160,9 +161,13 @@ export async function createSession(opts: {
   scheduledAt?: string | null;
   courtLabels?: string[];
   trackShuttlecocks?: boolean;
+  /** Format jumlah set per match (Best of 1/2/3). Default 1. */
+  setsTarget?: number;
   communityId: string;
 }): Promise<DbSession> {
   const communityId = opts.communityId;
+  // Clamp ke 1..3 agar tak pernah menulis nilai di luar CHECK constraint DB.
+  const setsTarget = Math.min(3, Math.max(1, opts.setsTarget ?? 1));
   const { data, error } = await db()
     .from("session")
     .insert({
@@ -171,6 +176,7 @@ export async function createSession(opts: {
       status: opts.status ?? "ongoing",
       scheduled_at: opts.scheduledAt ?? null,
       track_shuttlecocks: opts.trackShuttlecocks ?? false,
+      sets_target: setsTarget,
       community_id: communityId,
     })
     .select("*")
@@ -368,6 +374,32 @@ export async function listMatches(sessionId: string): Promise<DbMatch[]> {
   return data ?? [];
 }
 
+/**
+ * Ambil semua baris match_set milik sebuah sesi (skor per set). Difilter via
+ * subquery match.session_id agar hanya set dari mabar ini yang terambil.
+ * Dipakai bersama listMatches -> toMatch untuk merakit Match.sets.
+ */
+export async function listMatchSets(
+  sessionId: string,
+): Promise<DbMatchSet[]> {
+  // Ambil id match milik sesi ini dulu (relasi match_set -> match -> session).
+  const { data: mIds, error: mErr } = await db()
+    .from("match")
+    .select("id")
+    .eq("session_id", sessionId);
+  if (mErr) throw mErr;
+  const ids = (mIds ?? []).map((r) => r.id);
+  if (ids.length === 0) return [];
+
+  const { data, error } = await db()
+    .from("match_set")
+    .select("*")
+    .in("match_id", ids)
+    .order("set_no");
+  if (error) throw error;
+  return data ?? [];
+}
+
 export async function createMatch(match: {
   sessionId: string;
   courtId: string | null;
@@ -505,6 +537,44 @@ export async function finishMatchAtomic(
     p_score_b: scoreB,
     p_winner: winner,
     p_shuttlecocks: Math.max(0, shuttlecocks),
+  });
+  if (error) throw error;
+}
+
+/**
+ * Catat SATU set sebuah match secara atomik. Bila match sudah diputus
+ * (mayoritas set tercapai atau semua set habis), RPC juga menyelesaikan match
+ * + update statistik 4 pemain (dari agregat total poin) dalam transaksi yang
+ * sama. Bila belum, match tetap 'playing'. Menolak set imbang (a == b).
+ * Idempoten terhadap retry (match yang sudah finished tidak diproses ulang).
+ */
+export async function finishSetAtomic(
+  matchId: string,
+  scoreA: number,
+  scoreB: number,
+  shuttlecocks = 0,
+): Promise<void> {
+  const { error } = await db().rpc("finish_set_atomic", {
+    p_match_id: matchId,
+    p_score_a: scoreA,
+    p_score_b: scoreB,
+    p_shuttlecocks: Math.max(0, shuttlecocks),
+  });
+  if (error) throw error;
+}
+
+/**
+ * Koreksi seluruh skor per-set sebuah match yang sudah selesai + hitung ulang
+ * agregat match & selisih statistik pemain, secara atomik. `sets` terurut set
+ * 1..n; tiap set harus punya pemenang (a != b).
+ */
+export async function editMatchSetsAtomic(
+  matchId: string,
+  sets: { a: number; b: number }[],
+): Promise<void> {
+  const { error } = await db().rpc("edit_match_sets_atomic", {
+    p_match_id: matchId,
+    p_sets: sets,
   });
   if (error) throw error;
 }

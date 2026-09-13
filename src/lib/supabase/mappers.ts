@@ -3,7 +3,7 @@
 // ============================================================================
 import type { Match, SessionPlayer } from "@/lib/domain/types";
 import { toTitleCase } from "@/lib/utils";
-import type { DbMatch, DbSessionPlayer } from "./types";
+import type { DbMatch, DbMatchSet, DbSessionPlayer } from "./types";
 
 export function toSessionPlayer(row: DbSessionPlayer): SessionPlayer {
   return {
@@ -27,7 +27,15 @@ export function toSessionPlayer(row: DbSessionPlayer): SessionPlayer {
   };
 }
 
-export function toMatch(row: DbMatch): Match {
+export function toMatch(row: DbMatch, setRows?: DbMatchSet[]): Match {
+  // Skor per set (terurut set_no). Hanya baris milik match ini yang dipakai
+  // bila pemanggil mengirim gabungan semua set sesi.
+  const sets = (setRows ?? [])
+    .filter((s) => s.match_id === row.id)
+    .slice()
+    .sort((x, y) => x.set_no - y.set_no)
+    .map((s) => ({ a: s.score_a, b: s.score_b }));
+
   return {
     id: row.id,
     courtId: row.court_id ?? "",
@@ -42,6 +50,7 @@ export function toMatch(row: DbMatch): Match {
       row.score_a !== null && row.score_b !== null
         ? { a: row.score_a, b: row.score_b }
         : null,
+    sets,
     winner: row.winner,
     shuttlecocks: row.shuttlecocks ?? 0,
   };
