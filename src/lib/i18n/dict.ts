@@ -417,6 +417,10 @@ export const DICT = {
   "finishMatch.save": { id: "Simpan", en: "Save" },
   "finishMatch.shuttlecocks": { id: "Kok kepakai", en: "Shuttlecocks used" },
   "finishMatch.shuttlecocksHint": { id: "per biji (opsional)", en: "per piece (optional)" },
+  "finishMatch.shuttlecocksCarry": {
+    id: "Total kok match ini (sudah termasuk set sebelumnya) — tambah bila ada kok baru.",
+    en: "Total shuttlecocks for this match (includes earlier sets) — add more if new ones were used.",
+  },
   // Multi-set (Best of 2/3)
   "finishMatch.setTitle": { id: "Skor Set {s} · Match ke-{n}", en: "Set {s} Score · Match #{n}" },
   "finishMatch.setSubtitle": {

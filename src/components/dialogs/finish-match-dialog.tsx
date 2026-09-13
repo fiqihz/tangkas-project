@@ -25,8 +25,14 @@ export function FinishMatchDialog({
   const isMultiSet = progress.target > 1;
   const [scoreA, setScoreA] = useState("");
   const [scoreB, setScoreB] = useState("");
-  // Default 1 kok (asumsi minimal 1 kepakai); host bisa ubah/kosongkan.
-  const [shuttlecocks, setShuttlecocks] = useState("1");
+  // Kok bersifat KUMULATIF per match (carry-over antar set). Default:
+  //  - Set pertama (belum ada set tercatat): "1" (asumsi minimal 1 kepakai).
+  //  - Set berikutnya: total kok berjalan yang sudah tersimpan di match, jadi
+  //    host tinggal menambah kok yang kepakai di set ini.
+  const playedSetCount = match.sets?.length ?? 0;
+  const [shuttlecocks, setShuttlecocks] = useState(() =>
+    playedSetCount > 0 ? String(match.shuttlecocks ?? 0) : "1",
+  );
   const [submitting, setSubmitting] = useState(false);
 
   const name = (id: string) => byId.get(id)?.name ?? "?";
@@ -166,6 +172,11 @@ export function FinishMatchDialog({
                 {t("finishMatch.shuttlecocksHint")}
               </span>
             </div>
+            {isMultiSet && playedSetCount > 0 && (
+              <p className="mt-1 text-xs text-muted-foreground">
+                {t("finishMatch.shuttlecocksCarry")}
+              </p>
+            )}
           </div>
         )}
 

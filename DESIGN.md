@@ -220,7 +220,7 @@ community dilakukan lewat RPC SECURITY DEFINER. Realtime aktif di `match`,
 permisif tabel data (allow-all untuk anon/authenticated) — konsisten dengan tabel
 sesi lain.
 
-Migrations (di `supabase/migrations/`): `001` sessions_played, `002` match state unfinished, `003` multi-status sesi, `004` match court_label, `005` checked_in_at, `006` gender (kolom `gender` di `player_profile` & `session_player`), `007` RPC atomik, `008` realtime filters, `009` match started_at, `010` **feedback** (tabel masukan landing + RLS anon insert-only), `011` **trigger notifikasi feedback** (via `net.http_post` → Edge Function, bypass UI Webhook), `012` **membership & invite** (enum `membership_role`/`invite_status`), `013` **RLS ketat + helper functions** (`is_member`/`has_role`), `014` **trigger `pg_net` → Edge Function `send-invite`**, `015` **RPC** (`create_community_with_owner`, `claim_legacy_data`, `redeem_invite`, `kick_member`), `016` **`redeem_invite` email-bound + `list_community_members_with_email`**, `017` **shuttlecock & paid** (`session.track_shuttlecocks`, `match.shuttlecocks`, `session_player.paid` + `finish_match_atomic` tambah `p_shuttlecocks`), `018` **multi-set** (`session.sets_target`, tabel `match_set`, RPC `finish_set_atomic` & `edit_match_sets_atomic`, realtime `match_set`).
+Migrations (di `supabase/migrations/`): `001` sessions_played, `002` match state unfinished, `003` multi-status sesi, `004` match court_label, `005` checked_in_at, `006` gender (kolom `gender` di `player_profile` & `session_player`), `007` RPC atomik, `008` realtime filters, `009` match started_at, `010` **feedback** (tabel masukan landing + RLS anon insert-only), `011` **trigger notifikasi feedback** (via `net.http_post` → Edge Function, bypass UI Webhook), `012` **membership & invite** (enum `membership_role`/`invite_status`), `013` **RLS ketat + helper functions** (`is_member`/`has_role`), `014` **trigger `pg_net` → Edge Function `send-invite`**, `015` **RPC** (`create_community_with_owner`, `claim_legacy_data`, `redeem_invite`, `kick_member`), `016` **`redeem_invite` email-bound + `list_community_members_with_email`**, `017` **shuttlecock & paid** (`session.track_shuttlecocks`, `match.shuttlecocks`, `session_player.paid` + `finish_match_atomic` tambah `p_shuttlecocks`), `018` **multi-set** (`session.sets_target`, tabel `match_set`, RPC `finish_set_atomic` & `edit_match_sets_atomic`, realtime `match_set`), `019` **carry-over kok** (`finish_set_atomic` simpan `match.shuttlecocks` tiap set, bukan hanya saat final).
 
 ---
 
@@ -619,12 +619,25 @@ satu match = satu skor tunggal (single set). Dikerjakan via Vibe.
   deskripsi fitur yang sudah live (pilih format, input per set, pemenang mayoritas
   set, seri dicatat).
 
+### Kok (shuttlecock) kumulatif — carry-over antar set
+- Kok bersifat **kumulatif per match** (bukan per set). Nilai yang dikirim tiap
+  `finishSet` adalah **total kok berjalan** sampai set itu.
+- `finish_set_atomic` menyimpan `match.shuttlecocks` di **setiap** set (bukan
+  hanya saat final) — perbaikan di migration **`019`** (sebelumnya kok set
+  non-final dibuang).
+- Dialog Finish default field kok: set pertama → `1` (asumsi minimal 1); set
+  berikutnya → **total kok tersimpan** sejauh ini, host tinggal menambah kok yang
+  kepakai di set itu. Hint "total kok match ini (termasuk set sebelumnya)".
+- Edit skor (`edit_match_sets_atomic`) **tidak** menyentuh kok — total kok tetap
+  seperti terakhir tercatat.
+
 ### Kompatibilitas & deploy
 - **Backward-compatible**: mabar lama = `sets_target` 1; match lama tetap terbaca
   dari agregat `score_a/score_b` walau `match_set` kosong.
-- **Urutan deploy**: jalankan migration `018` di Supabase **sebelum** deploy kode
-  (kode baru memanggil RPC & tabel baru). Aman dilakukan bahkan saat ada mabar
-  berjalan (semua mabar lama = Best of 1, alur Finish identik dengan sebelumnya).
+- **Urutan deploy**: jalankan migration `018` **lalu** `019` di Supabase
+  **sebelum** deploy kode (kode baru memanggil RPC & tabel baru). Aman dilakukan
+  bahkan saat ada mabar berjalan (semua mabar lama = Best of 1, alur Finish
+  identik dengan sebelumnya).
 
 ### Verifikasi
 Lolos `npm run typecheck` + `npm run lint` + `npm run test` (92 passed) +
