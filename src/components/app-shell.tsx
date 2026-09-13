@@ -215,9 +215,9 @@ function AppShellContent() {
 }
 
 function ReadOnlyResult() {
-  const { session, players, backToList } = useSessionStore();
+  const { session, players, matches, backToList } = useSessionStore();
   const t = useT();
-  const rows = buildLeaderboard(players.filter((p) => p.gamesPlayed > 0));
+  const rows = buildLeaderboard(players.filter((p) => p.gamesPlayed > 0), matches);
   const [toast, setToast] = useState<string | null>(null);
   // Tab di layar hasil finished: "result" (leaderboard) + "history" (daftar
   // match per lapangan, read-only) agar host bisa menengok tiap skor match.
@@ -349,13 +349,13 @@ function ReadOnlyResult() {
                     <td className="px-2 py-2 text-center">{r.wins}</td>
                     <td className="px-2 py-2 text-center">{r.losses}</td>
                     <td className="px-2 py-2 text-center text-primary">
-                      {r.bonus > 0 ? `+${r.bonus}` : "-"}
+                      {r.bonusDisplay > 0 ? `+${r.bonusDisplay}` : "-"}
                     </td>
                     <td className="px-2 py-2 text-center">
-                      {r.pointDiff >= 0 ? "+" : ""}
-                      {r.pointDiff}
+                      {r.pointDiffDisplay >= 0 ? "+" : ""}
+                      {r.pointDiffDisplay}
                     </td>
-                    <td className="px-2 py-2 text-center">{r.pointsScored}</td>
+                    <td className="px-2 py-2 text-center">{r.pointsDisplay}</td>
                   </tr>
                 ))}
               </tbody>

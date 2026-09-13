@@ -165,6 +165,107 @@ describe("scoring & leaderboard", () => {
     expect(lb[0].name).toBe("B"); // poin 114 > 100, jumlah menang tidak dipakai
     expect(lb[0].rank).toBe(1);
   });
+
+  it("normalisasi per-set: match 2-set vs 3-set setara skalanya", () => {
+    // Skenario dari 2 match nyata:
+    //   Match 1 (2 set): Tim A [P1,P2] 21-15, 21-5  -> total A=42, B=20
+    //   Match 2 (3 set): Tim A [P5,P2] 21-13,19-21,21-6 -> total A=61, B=40
+    const players = [
+      makePlayer("P1", "beginner", { id: "P1", gamesPlayed: 2, wins: 1, losses: 1 }),
+      makePlayer("P2", "beginner", { id: "P2", gamesPlayed: 2, wins: 2 }),
+      makePlayer("P3", "beginner", { id: "P3", gamesPlayed: 2, losses: 2 }),
+      makePlayer("P4", "beginner", { id: "P4", gamesPlayed: 1, losses: 1 }),
+      makePlayer("P5", "beginner", { id: "P5", gamesPlayed: 1, wins: 1 }),
+    ];
+    const matches: Match[] = [
+      {
+        id: "m1",
+        courtId: "c1",
+        round: 1,
+        teamA: { playerIds: ["P1", "P2"] },
+        teamB: { playerIds: ["P3", "P4"] },
+        state: "finished",
+        score: { a: 42, b: 20 },
+        sets: [
+          { a: 21, b: 15 },
+          { a: 21, b: 5 },
+        ],
+        winner: "a",
+        shuttlecocks: 0,
+      },
+      {
+        id: "m2",
+        courtId: "c1",
+        round: 2,
+        teamA: { playerIds: ["P5", "P2"] },
+        teamB: { playerIds: ["P1", "P3"] },
+        state: "finished",
+        score: { a: 61, b: 40 },
+        sets: [
+          { a: 21, b: 13 },
+          { a: 19, b: 21 },
+          { a: 21, b: 6 },
+        ],
+        winner: "a",
+        shuttlecocks: 0,
+      },
+    ];
+
+    const byId = Object.fromEntries(
+      buildLeaderboard(players, matches).map((r) => [r.playerId, r]),
+    );
+
+    // Poin inti P5 (tanpa bonus) = 61/3 ≈ 20.33; TIDAK melonjak melebihi
+    // skala match 2-set. Bandingkan dgn skema lama yg memberi 61 mentah.
+    // (P5 main 1 match sedangkan max = 2, jadi total-nya termasuk bonus +M.)
+    expect(byId.P5.pointsScored - byId.P5.bonus).toBeCloseTo(61 / 3, 5);
+    // P2 juara: 42/2 + 61/3 = 21 + 20.33 = 41.33 (main 2 match, bonus 0).
+    expect(byId.P2.bonus).toBe(0);
+    expect(byId.P2.pointsScored).toBeCloseTo(21 + 61 / 3, 5);
+    expect(byId.P2.rank).toBe(1);
+    // Diff P2 ternormalisasi: (21 + 20.33) - (10 + 13.33) = +18.
+    expect(byId.P2.pointDiff).toBeCloseTo(18, 5);
+    // Display dibulatkan.
+    expect(byId.P2.pointsDisplay).toBe(41);
+  });
+
+  it("bonus +M memakai basis rata-rata poin-per-set liga (bukan flat 25)", () => {
+    // Satu match 2-set: A[P1,P2] 21-10,21-12 -> total A=42, B=22.
+    // P3 tidak main (tertinggal 1 match) -> harus dapat bonus ~ rata-rata
+    // poin-per-set liga = (21 + 11) / 2 = 16, bukan 25.
+    const players = [
+      makePlayer("P1", "beginner", { id: "P1", gamesPlayed: 1, wins: 1 }),
+      makePlayer("P2", "beginner", { id: "P2", gamesPlayed: 1, wins: 1 }),
+      makePlayer("P3", "beginner", { id: "P3", gamesPlayed: 1, losses: 1 }),
+      makePlayer("P4", "beginner", { id: "P4", gamesPlayed: 1, losses: 1 }),
+      // P5 belum kebagian main sama sekali di match manapun.
+      makePlayer("P5", "beginner", { id: "P5", gamesPlayed: 0 }),
+    ];
+    const matches: Match[] = [
+      {
+        id: "m1",
+        courtId: "c1",
+        round: 1,
+        teamA: { playerIds: ["P1", "P2"] },
+        teamB: { playerIds: ["P3", "P4"] },
+        state: "finished",
+        score: { a: 42, b: 22 },
+        sets: [
+          { a: 21, b: 10 },
+          { a: 21, b: 12 },
+        ],
+        winner: "a",
+        shuttlecocks: 0,
+      },
+    ];
+
+    const byId = Object.fromEntries(
+      buildLeaderboard(players, matches).map((r) => [r.playerId, r]),
+    );
+    // avg poin/set liga = (42 + 22) / (2 set * 2 sisi) = 64/4 = 16.
+    expect(byId.P5.bonus).toBeCloseTo(16, 5);
+    expect(byId.P5.bonusDisplay).toBe(16);
+  });
 });
 
 describe("substitute", () => {

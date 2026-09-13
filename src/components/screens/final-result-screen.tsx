@@ -32,7 +32,7 @@ export function FinalResultScreen({
   const { clearFinishedResult } = useSessionStore();
   const [toast, setToast] = useState<string | null>(null);
 
-  const rows = useMemo(() => buildLeaderboard(players), [players]);
+  const rows = useMemo(() => buildLeaderboard(players, matches), [players, matches]);
   const podium = rows.slice(0, 3);
   const rest = rows.slice(3);
   const cocks = useMemo(() => shuttlecockStats(matches), [matches]);
@@ -100,14 +100,14 @@ export function FinalResultScreen({
                           {r.winRate}%
                         </td>
                         <td className="px-1.5 py-2 text-center text-primary">
-                          {r.bonus > 0 ? `+${r.bonus}` : "-"}
+                          {r.bonusDisplay > 0 ? `+${r.bonusDisplay}` : "-"}
                         </td>
                         <td className="px-1.5 py-2 text-center">
-                          {r.pointDiff >= 0 ? "+" : ""}
-                          {r.pointDiff}
+                          {r.pointDiffDisplay >= 0 ? "+" : ""}
+                          {r.pointDiffDisplay}
                         </td>
                         <td className="px-1.5 py-2 text-center">
-                          {r.pointsScored}
+                          {r.pointsDisplay}
                         </td>
                         {trackShuttlecocks && (
                           <td className="px-1.5 py-2 text-center text-muted-foreground">
@@ -179,8 +179,8 @@ function Podium({
             {row.name}
           </div>
           <div className="mb-1 text-xs text-muted-foreground">
-            {row.wins}M · {row.pointDiff >= 0 ? "+" : ""}
-            {row.pointDiff}
+            {row.wins}M · {row.pointDiffDisplay >= 0 ? "+" : ""}
+            {row.pointDiffDisplay}
           </div>
           <div
             className={cn(

@@ -19,8 +19,8 @@ export function FinishScreen() {
   const [finishing, setFinishing] = useState(false);
 
   const rows = useMemo(
-    () => buildLeaderboard(players.filter((p) => p.gamesPlayed > 0)),
-    [players],
+    () => buildLeaderboard(players.filter((p) => p.gamesPlayed > 0), matches),
+    [players, matches],
   );
   const champion = rows[0];
   const cockTotal = useMemo(
@@ -63,8 +63,8 @@ export function FinishScreen() {
               <div className="text-sm text-muted-foreground">
                 {t("finish.winsPoints", {
                   wins: champion.wins,
-                  diff: `${champion.pointDiff >= 0 ? "+" : ""}${champion.pointDiff}`,
-                  points: champion.pointsScored,
+                  diff: `${champion.pointDiffDisplay >= 0 ? "+" : ""}${champion.pointDiffDisplay}`,
+                  points: champion.pointsDisplay,
                 })}
               </div>
             </CardContent>

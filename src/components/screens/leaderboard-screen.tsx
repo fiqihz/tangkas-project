@@ -14,8 +14,8 @@ export function LeaderboardScreen() {
   const trackShuttlecocks = session?.track_shuttlecocks ?? false;
 
   const rows = useMemo(
-    () => buildLeaderboard(players.filter((p) => p.gamesPlayed > 0)),
-    [players],
+    () => buildLeaderboard(players.filter((p) => p.gamesPlayed > 0), matches),
+    [players, matches],
   );
 
   // Poin 5: kok per pemain (angka penuh) — dihitung dari match yang finished.
@@ -101,13 +101,13 @@ export function LeaderboardScreen() {
                     {r.winRate}%
                   </td>
                   <td className="px-1.5 py-2 text-center text-primary">
-                    {r.bonus > 0 ? `+${r.bonus}` : "-"}
+                    {r.bonusDisplay > 0 ? `+${r.bonusDisplay}` : "-"}
                   </td>
                   <td className="px-1.5 py-2 text-center">
-                    {r.pointDiff >= 0 ? "+" : ""}
-                    {r.pointDiff}
+                    {r.pointDiffDisplay >= 0 ? "+" : ""}
+                    {r.pointDiffDisplay}
                   </td>
-                  <td className="px-1.5 py-2 text-center">{r.pointsScored}</td>
+                  <td className="px-1.5 py-2 text-center">{r.pointsDisplay}</td>
                   {trackShuttlecocks && (
                     <td className="px-1.5 py-2 text-center text-muted-foreground">
                       {cockPerPlayer.get(r.playerId) ?? 0}
