@@ -19,6 +19,12 @@ lengkap di `.kiro/specs/phase-2-auth-multitenant/`.
 (lihat §20) — host memilih format set saat membuat mabar, skor diisi **per set**,
 pemenang match ditentukan mayoritas set, dan skor imbang tercatat sebagai **seri**.
 
+**Enhancement Scoring Adil per-Set sudah diimplementasi & di-push ke `main`**
+(lihat §21) — poin & selisih (Diff) di leaderboard kini dihitung sebagai
+**rata-rata per set**, bukan total mentah, agar match 2-set dan 3-set setara
+skalanya. Bonus **+M** ikut disesuaikan ke rata-rata poin-per-set liga. Murni
+**display-layer** (data per-set di DB tidak berubah).
+
 ---
 
 ## 1. Tujuan
@@ -157,11 +163,12 @@ Semua penggantian tetap patuh hard rule (Newbie+Newbie ditolak).
 - **Format set dipilih host per mabar**: 1 set / best of 2 / best of 3 (`session.sets_target`). Detail multi-set di §20.
 - Poin per set fleksibel (mis. 21/30) — **tidak ada validasi maksimal poin**; satu set individual tidak boleh imbang (harus ada pemenang).
 - Dicatat per set (tabel `match_set`). **Pemenang match** = mayoritas set menang; set imbang total → **seri** (`draw`). Ganda → 1 hasil match (menang/kalah/seri) berlaku untuk **2 pemain** tim.
-- **Poin pemain = TOTAL poin semua set** (skema existing), diakumulasi ke `points_scored`/`points_conceded`. Selisih total masuk ke Diff. Satu match tetap = **satu** W/L/S (bukan per set).
-- **Bonus poin tertinggal**: pemain yang jatah mainnya kurang dari yang terbanyak main dapat **25 poin × selisih match** (dihitung on-the-fly, tidak dipersist). Bonus masuk ke **selisih poin** (tie-break), bukan menambah jumlah menang.
-- **Kolom leaderboard**: `#`, Pemain, **M** (menang), **K** (kalah), **S** (seri), **WR** (win rate = menang/main×100), **+M** (bonus tertinggal), **Diff** (selisih poin termasuk bonus), **Poin** (total skor).
+- **Poin pemain = RATA-RATA poin per set** (total poin tim di sebuah match dibagi jumlah set match itu, lalu dijumlah antar match) — lihat §21. Ini menggantikan skema total-mentah agar match 2-set & 3-set setara skalanya. Selisih (Diff) juga dinormalisasi per set. Satu match tetap = **satu** W/L/S (bukan per set). Data mentah tetap disimpan sebagai total di `points_scored`/`points_conceded` + per-set di `match_set`; normalisasi dilakukan di **display-layer** (`buildLeaderboard`).
+- **Bonus poin tertinggal (+M)**: pemain yang jatah mainnya kurang dari yang terbanyak main dapat bonus = **rata-rata poin-per-set liga × selisih match** (dihitung on-the-fly, tidak dipersist; fallback 21 bila belum ada match selesai). Menggantikan flat 25 lama agar satuannya nyambung dengan poin ternormalisasi. Bonus **menambah kolom Poin** (bukan Diff).
+- **Kolom leaderboard**: `#`, Pemain, **M** (menang), **K** (kalah), **S** (seri), **WR** (win rate = menang/main×100), **+M** (bonus tertinggal), **Diff** (selisih poin ternormalisasi per set), **Poin** (poin ternormalisasi + bonus).
+- **Tampilan dibulatkan, sorting pakai desimal**: kolom Poin/Diff/+M ditampilkan sebagai bilangan bulat, tetapi urutan ranking memakai nilai desimal penuh agar beda tipis tidak jadi seri palsu.
 - **Livescore**: leaderboard **&** skor per set update otomatis tiap set/Finish (tab Skor).
-- **Tie-break ranking**: (1) jumlah menang → (2) selisih poin (termasuk bonus) → (3) total poin → (4) nama.
+- **Tie-break ranking**: (1) total Poin (ternormalisasi + bonus) → (2) selisih poin ternormalisasi → (3) nama. Jumlah menang **tidak** dipakai sebagai penentu urutan.
 
 ### SELESAI MABAR
 - Konfirmasi → counter "ikut mabar" (`sessions_played`) +1 untuk pemain yang **benar-benar main** (`gamesPlayed > 0`) → sesi jadi `finished`.
@@ -243,8 +250,8 @@ Migrations (di `supabase/migrations/`): `001` sessions_played, `002` match state
 - Antrian jatah main (`queue.ts`)
 - History anti-repeat partner/lawan (`history.ts`)
 - Pengganti/substitusi (`substitute.ts`)
-- Akumulasi skor, bonus tertinggal, win rate, tie-break (`leaderboard.ts`)
-- Tes: `domain.test.ts`, `rotation.test.ts`, `modes.test.ts` (**23 tes**).
+- Akumulasi skor, normalisasi poin/Diff **per set** (`perSetPlayerStats`), bonus tertinggal (basis rata-rata poin-per-set liga), win rate, tie-break (`leaderboard.ts` — lihat §21).
+- Tes: `domain.test.ts`, `rotation.test.ts`, `modes.test.ts`.
 
 ---
 
@@ -262,6 +269,10 @@ Migrations (di `supabase/migrations/`): `001` sessions_played, `002` match state
 - **Multi-Set (Best of 1/2/3)** — ✅ **selesai & di-push ke `main`** (lihat §20).
   Format set dipilih host per mabar, skor per set, pemenang mayoritas set, seri
   dicatat, copy landing diselaraskan.
+- **Scoring Adil per-Set** — ✅ **selesai & di-push ke `main`** (lihat §21).
+  Poin & Diff dinormalisasi ke rata-rata per set (2-set vs 3-set setara), bonus
+  +M disesuaikan ke rata-rata poin-per-set liga, display dibulatkan dengan sort
+  desimal. Display-layer, backward-compatible.
 - **Dukungan tunggal (single)** — masih di roadmap (TangkasBoard fokus ganda 2v2).
 
 ---
@@ -642,3 +653,69 @@ satu match = satu skor tunggal (single set). Dikerjakan via Vibe.
 ### Verifikasi
 Lolos `npm run typecheck` + `npm run lint` + `npm run test` (92 passed) +
 `npm run build` (exit 0).
+
+---
+
+## 21. Enhancement — Scoring Adil per-Set (Normalisasi Poin & Diff)
+
+Status: **diimplementasi & di-push ke `main`** (1 commit). Memperbaiki
+ketidakadilan perhitungan poin livescore setelah fitur Multi-Set (§20). Dikerjakan
+via Vibe.
+
+### Masalah
+Sejak Multi-Set, poin pemain = **jumlah mentah** semua poin dari semua set yang
+dimainkan. Akibatnya match yang berlanjut ke **3 set** (karena skor set jadi 1-1)
+mengumpulkan **~50% poin lebih banyak** dibanding match yang selesai **2 set** —
+padahal itu murni efek format, bukan performa. Contoh nyata:
+- Match 1 (2 set): tim menang 21-15, 21-5 → **42 poin**.
+- Match 2 (3 set): tim menang 21-13, 19-21, 21-6 → **61 poin**.
+
+Pemain yang kebetulan mainnya 3 set melonjak di leaderboard tanpa alasan skill.
+Bonus **+M** flat **25** juga jadi timpang setelah normalisasi (skalanya ikut
+sistem poin lama yang besar).
+
+### Keputusan (locked)
+- **Opsi A + C — normalisasi per set**: poin sebuah match untuk pemain =
+  `total_poin_tim ÷ jumlah_set_match`. Diff ikut dinormalisasi dengan cara sama.
+  Match 2-set & 3-set jadi setara skalanya (rata-rata per set).
+- **Display-layer, bukan DB**: data mentah (`match.score_a/b` total + `match_set`
+  per set) **tidak diubah**; normalisasi dihitung ulang saat render dari `matches`.
+  Alasan: data per-set tetap utuh, formula gampang di-tweak/rollback, tidak perlu
+  migration/backfill.
+- **Bonus +M = rata-rata poin-per-set liga × match tertinggal** (Opsi 2 —
+  netral). Basis diturunkan dari data sesi (rata-rata poin-per-set semua match
+  selesai), fallback **21** bila belum ada match. Menggantikan flat 25 agar
+  satuannya nyambung dengan poin ternormalisasi & otomatis ikut skala sesi.
+- **Display dibulatkan, sort desimal**: kolom Poin/Diff/+M ditampilkan bulat,
+  tapi ranking memakai nilai desimal penuh (hindari seri palsu akibat pembulatan).
+
+### Implementasi
+- **`src/lib/domain/leaderboard.ts`**:
+  - Fungsi baru **`perSetPlayerStats(matches)`** → untuk tiap match `finished`,
+    bagi total tim dengan jumlah set (`sets.length`, fallback 1 untuk match lama/
+    BoF1) lalu akumulasi per pemain; sekaligus hitung `avgPointsPerSet` liga.
+  - **`buildLeaderboard(players, matches?)`** — parameter `matches` **opsional**:
+    bila ada → poin/Diff ternormalisasi + bonus berbasis `avgPointsPerSet`; bila
+    tidak → **fallback** ke skema total-mentah lama (kompatibilitas pemanggil yang
+    tak mengirim match, mis. `share-result`).
+  - `LeaderboardRow` menambah field display: **`pointsDisplay`**,
+    **`pointDiffDisplay`**, **`bonusDisplay`** (bulat). Field `pointsScored`/
+    `pointDiff`/`bonus` tetap desimal penuh untuk sorting.
+  - Konstanta `MISSED_MATCH_BONUS = 25` diganti `MISSED_MATCH_FALLBACK_BONUS = 21`.
+- **Pemanggil di-update** untuk mengirim `matches` & merender field `*Display`:
+  `leaderboard-screen.tsx`, `final-result-screen.tsx` (tabel + podium),
+  `finish-screen.tsx` (champion card), `app-shell.tsx` (ReadOnlyResult).
+  `share-result.ts` tidak diubah (tak merender kolom poin → aman via fallback).
+
+### Dampak
+- Ranking mencerminkan performa sebenarnya, tidak lagi bias jumlah set.
+- **Skala angka kolom Poin mengecil** (dari ratusan → puluhan) — konsekuensi
+  wajar normalisasi per-set, bukan bug.
+- Backward-compatible: match lama/BoF1 (tanpa baris `match_set`) dihitung sebagai
+  1 set → sama dengan sebelumnya.
+
+### Verifikasi
+Lolos `npm run typecheck` (exit 0) + `npm run test` (94 passed, 3 skipped —
+integration DB) + `npm run build` (Compiled successfully). Dua test baru di
+`domain.test.ts`: normalisasi per-set (skenario 2-set vs 3-set nyata) & bonus +M
+berbasis rata-rata liga.
