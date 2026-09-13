@@ -15,6 +15,10 @@ sudah diimplementasi & di-merge ke `main`** (lihat §18) — Supabase Auth
 role `owner`/`admin`, invite admin email-bound, dan RLS ketat per-community. Spec
 lengkap di `.kiro/specs/phase-2-auth-multitenant/`.
 
+**Enhancement Multi-Set (Best of 1/2/3) sudah diimplementasi & di-push ke `main`**
+(lihat §20) — host memilih format set saat membuat mabar, skor diisi **per set**,
+pemenang match ditentukan mayoritas set, dan skor imbang tercatat sebagai **seri**.
+
 ---
 
 ## 1. Tujuan
@@ -22,7 +26,7 @@ lengkap di `.kiro/specs/phase-2-auth-multitenant/`.
 Aplikasi manajemen sesi mabar (main bareng) badminton ganda (2v2) untuk host:
 
 1. **Matchmaking adil** — bagi pemain ke lapangan dengan mempertimbangkan level & pemerataan jatah main.
-2. **Scoring & leaderboard** — catat skor tiap match, akumulasi menang/kalah + poin, tentukan juara (hadiah voucher).
+2. **Scoring & leaderboard** — catat skor **per set** (1 set / best of 2 / best of 3), akumulasi menang/kalah/seri + poin, tentukan juara (hadiah voucher).
 3. **Level dinamis** — level pemain ditentukan host lewat observasi; match berikutnya menyesuaikan.
 4. **Manajemen multi-sesi** — daftar mabar (terjadwal/berjalan/selesai), history, edit skor.
 
@@ -150,11 +154,13 @@ Semua penggantian tetap patuh hard rule (Newbie+Newbie ditolak).
 
 ## 9. Scoring & Leaderboard
 
-- Format default: **30 poin × 1 set** (fleksibel, bisa berubah).
-- Dicatat: skor akhir match + pemenang. Ganda → 1 kemenangan berlaku untuk **2 pemain** tim menang.
+- **Format set dipilih host per mabar**: 1 set / best of 2 / best of 3 (`session.sets_target`). Detail multi-set di §20.
+- Poin per set fleksibel (mis. 21/30) — **tidak ada validasi maksimal poin**; satu set individual tidak boleh imbang (harus ada pemenang).
+- Dicatat per set (tabel `match_set`). **Pemenang match** = mayoritas set menang; set imbang total → **seri** (`draw`). Ganda → 1 hasil match (menang/kalah/seri) berlaku untuk **2 pemain** tim.
+- **Poin pemain = TOTAL poin semua set** (skema existing), diakumulasi ke `points_scored`/`points_conceded`. Selisih total masuk ke Diff. Satu match tetap = **satu** W/L/S (bukan per set).
 - **Bonus poin tertinggal**: pemain yang jatah mainnya kurang dari yang terbanyak main dapat **25 poin × selisih match** (dihitung on-the-fly, tidak dipersist). Bonus masuk ke **selisih poin** (tie-break), bukan menambah jumlah menang.
-- **Kolom leaderboard**: `#`, Pemain, **M** (menang), **K** (kalah), **WR** (win rate = menang/main×100), **+M** (bonus tertinggal), **Diff** (selisih poin termasuk bonus), **Poin** (total skor).
-- **Livescore**: update otomatis tiap Finish (tab Skor).
+- **Kolom leaderboard**: `#`, Pemain, **M** (menang), **K** (kalah), **S** (seri), **WR** (win rate = menang/main×100), **+M** (bonus tertinggal), **Diff** (selisih poin termasuk bonus), **Poin** (total skor).
+- **Livescore**: leaderboard **&** skor per set update otomatis tiap set/Finish (tab Skor).
 - **Tie-break ranking**: (1) jumlah menang → (2) selisih poin (termasuk bonus) → (3) total poin → (4) nama.
 
 ### SELESAI MABAR
@@ -179,7 +185,8 @@ Semua penggantian tetap patuh hard rule (Newbie+Newbie ditolak).
 
 - Tab **History**: semua match yang sudah berlalu (`finished` & `unfinished`), dikelompokkan **per lapangan**.
 - Match menyimpan **snapshot nama lapangan** (`court_label`) → history tetap menampilkan nama walau lapangan dihapus.
-- **Edit skor** match `finished`: statistik pemain **dihitung ulang** (undo skor lama → apply skor baru) agar leaderboard konsisten. Match `unfinished` tidak bisa diedit.
+- **Tampilan skor**: match multi-set menampilkan **skor per set** (mis. `21-15, 18-21, 21-19`), bukan total agregat (total gabungan tak lazim di badminton). Match seri diberi badge **Seri**. Match lama / Best of 1 tanpa baris set fallback ke skor tunggal.
+- **Edit skor** match `finished`: dialog mengedit **skor per set**; agregat & statistik pemain **dihitung ulang** di DB (RPC `edit_match_sets_atomic` — recompute agregat + selisih delta W/L/S & poin) agar leaderboard konsisten. Match `unfinished` tidak bisa diedit.
 
 ---
 
@@ -197,10 +204,11 @@ Multi-tenant nyata (Opsi C aktif sejak Fase 2, lihat §18):
 - **invite** — undangan admin email-bound: `email`, `community_id`, `role` (admin),
   `token`, `status`, `expires_at`, `invited_by`. Token sekali pakai + expiry 7 hari.
 - **player_profile** (roster, permanen) — nama + level + `sessions_played`. Tidak ter-reset antar mabar.
-- **session** — status (scheduled/ongoing/finished), courts, current_round, scheduled_at.
-- **session_player** — state pemain per mabar: status, level, `checked_in_at`, games_played, last_played_round, available_since_round, wins/losses/draws, points_scored/conceded, profile_id.
+- **session** — status (scheduled/ongoing/finished), courts, current_round, scheduled_at, `track_shuttlecocks`, **`sets_target`** (1/2/3 — format set per match, default 1).
+- **session_player** — state pemain per mabar: status, level, `checked_in_at`, games_played, last_played_round, available_since_round, wins/losses/draws, points_scored/conceded, `paid`, profile_id.
 - **court** — lapangan (label, position).
-- **match** — court_id, `court_label` (snapshot), round, 4 pemain, state, skor, winner.
+- **match** — court_id, `court_label` (snapshot), round, 4 pemain, state, skor **agregat** (`score_a`/`score_b`/`winner` = total poin semua set + pemenang akhir), `shuttlecocks`.
+- **match_set** — skor **per set** dari sebuah match: `match_id`, `set_no`, `score_a`, `score_b` (unik per `match_id`+`set_no`). Sumber detail set; agregat di `match` tetap dipakai konsumen lama (leaderboard, roster stats lintas-mabar). Lihat §20.
 
 **RLS ketat per-community** menggantikan policy permisif anon `using(true)` lama.
 Helper `is_member()` / `has_role()` (SECURITY DEFINER): tabel induk (`community`,
@@ -208,9 +216,11 @@ Helper `is_member()` / `has_role()` (SECURITY DEFINER): tabel induk (`community`
 (`session_player`, `court`, `match`) mengecek via join ke `session.community_id`.
 Write hanya untuk `authenticated`, dan operasi tulis `membership`/`invite`/pembuatan
 community dilakukan lewat RPC SECURITY DEFINER. Realtime aktif di `match`,
-`session_player`, `court`.
+`session_player`, `court`, `session`, `match_set`. `match_set` mengikuti pola RLS
+permisif tabel data (allow-all untuk anon/authenticated) — konsisten dengan tabel
+sesi lain.
 
-Migrations (di `supabase/migrations/`): `001` sessions_played, `002` match state unfinished, `003` multi-status sesi, `004` match court_label, `005` checked_in_at, `006` gender (kolom `gender` di `player_profile` & `session_player`), `007` RPC atomik, `008` realtime filters, `009` match started_at, `010` **feedback** (tabel masukan landing + RLS anon insert-only), `011` **trigger notifikasi feedback** (via `net.http_post` → Edge Function, bypass UI Webhook), `012` **membership & invite** (enum `membership_role`/`invite_status`), `013` **RLS ketat + helper functions** (`is_member`/`has_role`), `014` **trigger `pg_net` → Edge Function `send-invite`**, `015` **RPC** (`create_community_with_owner`, `claim_legacy_data`, `redeem_invite`, `kick_member`), `016` **`redeem_invite` email-bound + `list_community_members_with_email`**.
+Migrations (di `supabase/migrations/`): `001` sessions_played, `002` match state unfinished, `003` multi-status sesi, `004` match court_label, `005` checked_in_at, `006` gender (kolom `gender` di `player_profile` & `session_player`), `007` RPC atomik, `008` realtime filters, `009` match started_at, `010` **feedback** (tabel masukan landing + RLS anon insert-only), `011` **trigger notifikasi feedback** (via `net.http_post` → Edge Function, bypass UI Webhook), `012` **membership & invite** (enum `membership_role`/`invite_status`), `013` **RLS ketat + helper functions** (`is_member`/`has_role`), `014` **trigger `pg_net` → Edge Function `send-invite`**, `015` **RPC** (`create_community_with_owner`, `claim_legacy_data`, `redeem_invite`, `kick_member`), `016` **`redeem_invite` email-bound + `list_community_members_with_email`**, `017` **shuttlecock & paid** (`session.track_shuttlecocks`, `match.shuttlecocks`, `session_player.paid` + `finish_match_atomic` tambah `p_shuttlecocks`), `018` **multi-set** (`session.sets_target`, tabel `match_set`, RPC `finish_set_atomic` & `edit_match_sets_atomic`, realtime `match_set`).
 
 ---
 
@@ -249,6 +259,10 @@ Migrations (di `supabase/migrations/`): `001` sessions_played, `002` match state
   Menyelaraskan visual app dengan landing (token & font bersama), plus polish
   copy landing. Dikerjakan via Vibe; arah desain di
   `.kiro/steering/phase-2-auth-multitenant.md` §4 + `FE-SKILL.MD`.
+- **Multi-Set (Best of 1/2/3)** — ✅ **selesai & di-push ke `main`** (lihat §20).
+  Format set dipilih host per mabar, skor per set, pemenang mayoritas set, seri
+  dicatat, copy landing diselaraskan.
+- **Dukungan tunggal (single)** — masih di roadmap (TangkasBoard fokus ganda 2v2).
 
 ---
 
@@ -518,3 +532,100 @@ mengubah layout/struktur/alur yang sudah teruji. Mengikuti batasan di
 Tiap perubahan lolos `npm run typecheck` + `npm run lint` + `npm run build`
 (exit 0). Build sekaligus memastikan `/app` tidak jebol akibat perubahan token/
 komponen bersama.
+
+---
+
+## 20. Enhancement — Multi-Set (Best of 1 / 2 / 3)
+
+Status: **diimplementasi & di-push ke `main`** (2 commit: fitur inti + polish copy
+landing). Menambah kemampuan mencatat lebih dari satu set per match. Sebelumnya
+satu match = satu skor tunggal (single set). Dikerjakan via Vibe.
+
+### Keputusan (locked)
+- **Format dipilih host saat membuat mabar**: 1 set / best of 2 / best of 3
+  (`session.sets_target`, default 1). Mabar lama otomatis = Best of 1.
+- **Input per set** (bukan sekali di akhir): host mengisi skor tiap set **begitu
+  set itu selesai**. Alasan: host input langsung di lapangan, tidak perlu hafal
+  skor beberapa set. Untuk best of 2/3, setelah simpan set match tetap `playing`
+  sampai match diputus, lalu otomatis `finished`.
+- **Pemenang match** = mayoritas set menang (`setsToWin = floor(target/2)+1` →
+  BoF1=1, BoF2=2, BoF3=2). Diputus bila salah satu tim mencapai `setsToWin`
+  **atau** semua `sets_target` set sudah dimainkan. Set imbang total → **seri**
+  (`draw`).
+- **Satu set individual tidak boleh imbang** — harus ada pemenang (dijaga di
+  client & RPC). Ini satu-satunya validasi skor; **tidak ada validasi poin
+  maksimal** (bebas 21/30/dst, akomodasi deuce & format komunitas yang beragam).
+- **Poin leaderboard = TOTAL poin semua set** (skema existing dipertahankan),
+  selisih total → Diff. Satu match tetap = satu W/L/S. Seri dicatat di kolom
+  `draws` + kolom baru **S (Seri)** di leaderboard; ranking tetap berbasis
+  Poin → Diff → nama (seri tidak mengubah cara sorting, hanya kolom info).
+
+### Model data
+- **`session.sets_target`** `int` (1/2/3, default 1, CHECK).
+- **`match_set`** — satu baris per set: `id`, `match_id` (FK, ON DELETE CASCADE),
+  `set_no` (≥1), `score_a`, `score_b`, `created_at`; **unique(`match_id`,`set_no`)**
+  sebagai jaring pengaman anti dobel-tap.
+- **`match.score_a`/`score_b`/`winner`** dipertahankan sebagai **AGREGAT** (total
+  poin semua set + pemenang akhir). Jadi leaderboard (`applyMatchResult`), history
+  lintas-mabar (`listResolvedMatches`/`roster-stats`), dan konsumen lama **tidak
+  berubah** — mereka tetap baca agregat.
+- Tipe: `DbSession.sets_target`, `DbMatchSet`, `Match.sets?: {a,b}[]` (opsional —
+  kosong untuk match lama/BoF1 tanpa baris set; `mappers.toMatch(row, setRows)`
+  merakit array set terurut `set_no`).
+
+### RPC atomik (jantung fitur — `supabase/migrations/018_multi_set.sql`)
+- **`finish_set_atomic(p_match_id, p_score_a, p_score_b, p_shuttlecocks)`**:
+  catat satu set (nomor set = `max(set_no)+1`, server-side → aman race), tolak set
+  imbang, rekap seluruh set. Bila **belum** diputus → set match `playing` saja
+  (statistik tidak disentuh). Bila **diputus** → tulis agregat ke `match`, set
+  `finished`, dan update statistik 4 pemain (menang/kalah/seri + total poin)
+  **sekali**. Idempoten: match yang sudah `finished` di-skip.
+- **`edit_match_sets_atomic(p_match_id, p_sets jsonb)`**: ganti seluruh baris
+  `match_set` sebuah match `finished` dengan daftar baru, hitung ulang agregat
+  match, lalu terapkan **selisih (delta)** W/L/S & poin ke 4 pemain — semua dalam
+  satu transaksi. Menolak set imbang & jumlah set melebihi format.
+- RPC lama `finish_match_atomic` (single-set) **tetap ada** sebagai jaring
+  pengaman untuk klien versi lama selama masa transisi; bisa dibersihkan setelah
+  yakin tak ada klien lama.
+
+### Store & repo
+- `repo`: `createSession` bawa `setsTarget`; `listMatchSets(sessionId)`;
+  `finishSetAtomic`; `editMatchSetsAtomic`. `openSession`/`refresh` fetch
+  `match_set` lalu `toMatch(m, matchSets)`.
+- `session-store`: `finishMatch` → **`finishSet`** (submit satu set, kembalikan
+  `{ok, reason}`, guard anti dobel-tap); `editMatchScore` → **`editMatchSets`**
+  (array set); helper baru **`setProgress(matchId)`** (`current`/`target`/
+  `setsWonA`/`setsWonB`) untuk judul & ringkasan progres.
+
+### UI
+- **Create session dialog**: selector segmented **1 set / Best of 2 / Best of 3**.
+- **Finish dialog**: judul **"Skor Set N · Match ke-M"** untuk multi-set, badge
+  "Best of N" + "Set menang — a:b", menolak set imbang, tombol **Simpan Set**.
+  Single-set tetap tampil seperti sebelumnya.
+- **Kartu lapangan** (`courts-screen`): badge **Set s/N**, chip skor tiap set yang
+  sudah selesai, label tombol **Selesai Set** (multi-set).
+- **Edit score dialog**: baris input skor **per set**; menolak set imbang.
+- **History**: skor **per set** sebagai tampilan utama (total agregat disembunyikan
+  — tak lazim di badminton), badge **Seri** bila draw; fallback skor tunggal untuk
+  match lama.
+- **Leaderboard**: kolom baru **S** (Seri/draw).
+
+### Landing page (copy diselaraskan)
+- **§1 What / Cara Kerja**: sebut skor per set & format 1/BoF2/BoF3; langkah
+  "catat skor" → "catat skor per set".
+- **Fitur**: kartu baru **Format Set Fleksibel**; Livescore diperluas (skor per
+  set ikut realtime).
+- **FAQ q3** dikoreksi dari klaim usang *"skor 1 set, 2–3 set on roadmap"* →
+  deskripsi fitur yang sudah live (pilih format, input per set, pemenang mayoritas
+  set, seri dicatat).
+
+### Kompatibilitas & deploy
+- **Backward-compatible**: mabar lama = `sets_target` 1; match lama tetap terbaca
+  dari agregat `score_a/score_b` walau `match_set` kosong.
+- **Urutan deploy**: jalankan migration `018` di Supabase **sebelum** deploy kode
+  (kode baru memanggil RPC & tabel baru). Aman dilakukan bahkan saat ada mabar
+  berjalan (semua mabar lama = Best of 1, alur Finish identik dengan sebelumnya).
+
+### Verifikasi
+Lolos `npm run typecheck` + `npm run lint` + `npm run test` (92 passed) +
+`npm run build` (exit 0).
