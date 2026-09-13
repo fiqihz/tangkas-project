@@ -533,8 +533,8 @@ export const DICT = {
   // What is it
   "landing.what.title": { id: "Apa itu TangkasBoard?", en: "What is TangkasBoard?" },
   "landing.what.body": {
-    id: "Aplikasi manajemen sesi main bareng (mabar) badminton ganda untuk host komunitas. Bagi pemain ke lapangan dengan adil berdasarkan level & jatah main, catat skor tiap match, dan lihat leaderboard langsung sampai penentuan juara.",
-    en: "A session manager for community badminton doubles hosts. Split players onto courts fairly based on level & play turns, record each match's score, and watch a live leaderboard through to the champion.",
+    id: "Aplikasi manajemen sesi main bareng (mabar) badminton ganda untuk host komunitas. Bagi pemain ke lapangan dengan adil berdasarkan level & jatah main, catat skor per set (1 set, best of 2, atau best of 3), dan lihat leaderboard langsung sampai penentuan juara.",
+    en: "A session manager for community badminton doubles hosts. Split players onto courts fairly based on level & play turns, record scores per set (single, best of 2, or best of 3), and watch a live leaderboard through to the champion.",
   },
 
   // How it works
@@ -553,10 +553,10 @@ export const DICT = {
     id: "Satu tap menyusun tim seimbang: mempertimbangkan level, jatah main, waktu tunggu, dan menghindari lawan yang itu-itu terus.",
     en: "One tap builds balanced teams: considering level, play turns, waiting time, and avoiding repeat opponents.",
   },
-  "landing.how.step3.title": { id: "Catat skor tiap match", en: "Record each match score" },
+  "landing.how.step3.title": { id: "Catat skor per set", en: "Record scores per set" },
   "landing.how.step3.body": {
-    id: "Selesai main, input skor. Leaderboard langsung update otomatis di semua perangkat.",
-    en: "After a match, enter the score. The leaderboard updates instantly across all devices.",
+    id: "Isi skor tiap set selesai. Untuk best of 2/3, match lanjut ke set berikutnya sampai pemenangnya jelas. Leaderboard update otomatis di semua perangkat.",
+    en: "Enter each set's score as it finishes. For best of 2/3, the match continues to the next set until a winner emerges. The leaderboard updates instantly across all devices.",
   },
   "landing.how.step4.title": { id: "Tentukan juara", en: "Crown the champion" },
   "landing.how.step4.body": {
@@ -583,8 +583,13 @@ export const DICT = {
   },
   "landing.features.livescore.title": { id: "Livescore Realtime", en: "Realtime Livescore" },
   "landing.features.livescore.body": {
-    id: "Leaderboard update otomatis di semua perangkat yang membuka sesi yang sama.",
-    en: "The leaderboard updates automatically on every device viewing the same session.",
+    id: "Leaderboard & skor per set update otomatis di semua perangkat yang membuka sesi yang sama.",
+    en: "The leaderboard & per-set scores update automatically on every device viewing the same session.",
+  },
+  "landing.features.sets.title": { id: "Format Set Fleksibel", en: "Flexible Set Format" },
+  "landing.features.sets.body": {
+    id: "Pilih 1 set, best of 2, atau best of 3 tiap mabar. Skor diisi per set; pemenang dari mayoritas set, seri pun tercatat.",
+    en: "Choose single set, best of 2, or best of 3 per session. Scores are entered per set; winner by set majority, and draws are recorded too.",
   },
   "landing.features.modes.title": { id: "Mode Match Beragam", en: "Varied Match Modes" },
   "landing.features.modes.body": {
@@ -669,10 +674,10 @@ export const DICT = {
     id: "Belum. Untuk saat ini TangkasBoard fokus pada ganda (2 lawan 2), format paling umum di mabar komunitas. Dukungan tunggal sedang kami pertimbangkan.",
     en: "Not yet. For now TangkasBoard focuses on doubles (2v2), the most common format in community sessions. Singles support is on our radar.",
   },
-  "landing.faq.q3": { id: "Berapa set per match yang dicatat?", en: "How many sets per match are recorded?" },
+  "landing.faq.q3": { id: "Berapa set per match yang bisa dicatat?", en: "How many sets per match can I record?" },
   "landing.faq.a3": {
-    id: "Saat ini skor dicatat per 1 set (mis. 30 poin). Format 2–3 set (best of three) sedang dalam rencana pengembangan.",
-    en: "Right now scores are recorded as a single set (e.g. 30 points). A 2–3 set format (best of three) is on the roadmap.",
+    id: "Bebas pilih saat bikin mabar: 1 set, best of 2, atau best of 3. Skor diisi per set begitu set selesai; pemenang match ditentukan dari mayoritas set menang, dan skor imbang tercatat sebagai seri.",
+    en: "Your choice when you create a session: single set, best of 2, or best of 3. Scores are entered per set as each one finishes; the match winner is decided by set majority, and a tied result is recorded as a draw.",
   },
   "landing.faq.q4": { id: "Bagaimana matchmaking menjaga keadilan?", en: "How does matchmaking stay fair?" },
   "landing.faq.a4": {

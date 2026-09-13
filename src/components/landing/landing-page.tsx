@@ -8,6 +8,7 @@ import {
   TrendingUp,
   LayoutGrid,
   Radio,
+  Layers,
   Shuffle,
   Smartphone,
   Languages,
@@ -56,6 +57,7 @@ export function LandingPage() {
       { icon: TrendingUp, titleKey: "landing.features.level.title", bodyKey: "landing.features.level.body" },
       { icon: LayoutGrid, titleKey: "landing.features.multicourt.title", bodyKey: "landing.features.multicourt.body" },
       { icon: Radio, titleKey: "landing.features.livescore.title", bodyKey: "landing.features.livescore.body" },
+      { icon: Layers, titleKey: "landing.features.sets.title", bodyKey: "landing.features.sets.body" },
       { icon: Shuffle, titleKey: "landing.features.modes.title", bodyKey: "landing.features.modes.body" },
       { icon: Smartphone, titleKey: "landing.features.install.title", bodyKey: "landing.features.install.body" },
     ];
