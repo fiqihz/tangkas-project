@@ -23,6 +23,8 @@ import { cn } from "@/lib/utils";
 import { buildLeaderboard } from "@/lib/domain/leaderboard";
 import { ScreenTransition } from "@/components/ui/motion";
 import { Toast } from "@/components/ui/toast";
+import { TourOverlay } from "@/components/tour/tour-overlay";
+import { useTourStore } from "@/lib/store/tour-store";
 import { SessionsListScreen } from "@/components/screens/sessions-list-screen";
 import { CommunitySwitcher } from "@/components/app/community-switcher";
 import { PlayersScreen } from "@/components/screens/players-screen";
@@ -50,11 +52,14 @@ export function AppShell() {
   const clearActionError = useSessionStore((s) => s.clearActionError);
   const online = useOnlineStatus();
   const hydrateSettings = useSettingsStore((s) => s.hydrate);
+  const maybeAutoStartTour = useTourStore((s) => s.maybeAutoStart);
 
-  // Sinkronkan tema & bahasa dari localStorage sekali di mount (client).
+  // Sinkronkan tema & bahasa dari localStorage sekali di mount (client),
+  // lalu tawarkan walkthrough sekali untuk user baru (flag tb.tourSeen).
   useEffect(() => {
     hydrateSettings();
-  }, [hydrateSettings]);
+    maybeAutoStartTour();
+  }, [hydrateSettings, maybeAutoStartTour]);
 
   return (
     <>
@@ -74,6 +79,9 @@ export function AppShell() {
         variant="error"
         onClose={clearActionError}
       />
+      {/* Walkthrough spotlight global (coach-marks). Dirender di root agar
+          bisa menyorot elemen di screen mana pun. */}
+      <TourOverlay />
     </>
   );
 }
@@ -85,6 +93,19 @@ function AppShellContent() {
   const unsubscribeRealtime = useSessionStore((s) => s.unsubscribeRealtime);
   const t = useT();
   const [view, setView] = useState<View>("courts");
+  // Saat walkthrough aktif, ia bisa meminta tab tertentu agar elemen yang
+  // disorot ter-render. `sessions` bukan tab board (itu keadaan "belum buka
+  // sesi"), jadi diabaikan di sini — hanya tab board yang disinkronkan.
+  // Berlangganan langsung ke store (bukan setState di body efek) agar tidak
+  // memicu cascading render.
+  useEffect(() => {
+    return useTourStore.subscribe((state, prev) => {
+      const rv = state.requestedView;
+      if (rv === prev.requestedView) return;
+      if (!rv || rv === "sessions") return;
+      setView(rv);
+    });
+  }, []);
 
   useEffect(() => {
     void loadSessions();

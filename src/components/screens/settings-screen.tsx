@@ -1,6 +1,6 @@
 "use client";
 
-import { Moon, Sun, Languages, LogOut } from "lucide-react";
+import { Moon, Sun, Languages, LogOut, Compass } from "lucide-react";
 import { useRouter } from "next/navigation";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent } from "@/components/ui/card";
@@ -8,6 +8,7 @@ import { ToggleSwitch } from "@/components/ui/toggle-switch";
 import { ManageAdminsButton } from "@/components/app/manage-admins-dialog";
 import { useSettingsStore } from "@/lib/store/settings-store";
 import { useAuthStore } from "@/lib/store/auth-store";
+import { useTourStore } from "@/lib/store/tour-store";
 import { haptic } from "@/lib/haptics";
 import { cn } from "@/lib/utils";
 import type { Lang } from "@/lib/i18n/dict";
@@ -19,6 +20,7 @@ export function SettingsScreen() {
   const setLang = useSettingsStore((s) => s.setLang);
   const t = useSettingsStore((s) => s.t);
   const signOut = useAuthStore((s) => s.signOut);
+  const startTour = useTourStore((s) => s.start);
   const router = useRouter();
 
   const isDark = theme === "dark";
@@ -103,6 +105,34 @@ export function SettingsScreen() {
                 code="EN"
               />
             </div>
+          </CardContent>
+        </Card>
+      </div>
+
+      {/* Panduan / walkthrough — jalankan ulang tur singkat kapan saja. */}
+      <div>
+        <div className="mb-2 text-sm font-medium text-muted-foreground">
+          {t("tour.section")}
+        </div>
+        <Card>
+          <CardContent className="py-2">
+            <button
+              onClick={() => {
+                haptic(8);
+                startTour();
+              }}
+              className="flex w-full select-none items-center gap-3 py-1.5 text-left active:opacity-70"
+            >
+              <span className="flex h-9 w-9 shrink-0 items-center justify-center rounded-lg bg-secondary text-foreground">
+                <Compass size={18} />
+              </span>
+              <div className="min-w-0">
+                <div className="font-medium">{t("tour.replay")}</div>
+                <div className="text-xs text-muted-foreground">
+                  {t("tour.replayDesc")}
+                </div>
+              </div>
+            </button>
           </CardContent>
         </Card>
       </div>

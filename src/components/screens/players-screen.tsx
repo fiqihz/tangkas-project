@@ -232,6 +232,7 @@ export function PlayersScreen() {
         onClick={() => setAdding(true)}
         icon={<Plus size={22} />}
         label={t("players.addFab")}
+        dataTour="add-player"
       />
 
       {adding && (

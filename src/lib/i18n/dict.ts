@@ -751,6 +751,61 @@ export const DICT = {
   "invite.acceptedGoApp": { id: "Undangan diterima. Membuka aplikasi…", en: "Invite accepted. Opening app…" },
   "invite.title": { id: "Terima undangan", en: "Accept invite" },
   "invite.needLogin": { id: "Masuk atau daftar untuk menerima undangan.", en: "Sign in or sign up to accept the invite." },
+
+  // Walkthrough / onboarding tour (spotlight coach-marks)
+  "tour.next": { id: "Lanjut", en: "Next" },
+  "tour.back": { id: "Kembali", en: "Back" },
+  "tour.skip": { id: "Lewati", en: "Skip" },
+  "tour.done": { id: "Selesai", en: "Done" },
+  "tour.stepOf": { id: "{current}/{total}", en: "{current}/{total}" },
+  "tour.replay": { id: "Lihat panduan lagi", en: "Show the walkthrough again" },
+  "tour.replayDesc": {
+    id: "Jalankan ulang tur singkat cara pakai TangkasBoard.",
+    en: "Replay the quick tour of how TangkasBoard works.",
+  },
+  "tour.section": { id: "Panduan", en: "Guide" },
+
+  // Step: create session (sessions list)
+  "tour.createTitle": { id: "Mulai dari bikin mabar", en: "Start by creating a session" },
+  "tour.createBody": {
+    id: "Tap di sini buat mabar baru. Atur jumlah lapangan sekalian di situ.",
+    en: "Tap here to create a new session. Set the number of courts while you're at it.",
+  },
+
+  // Step: add players
+  "tour.playersTitle": { id: "Tambah pemain", en: "Add players" },
+  "tour.playersBody": {
+    id: "Masukin pemain dari roster atau bikin baru. Set level & gender biar matchmaking lebih pas.",
+    en: "Add players from your roster or create new ones. Set level & gender so matchmaking works better.",
+  },
+
+  // Step: add court
+  "tour.courtsTitle": { id: "Atur lapangan", en: "Set up courts" },
+  "tour.courtsBody": {
+    id: "Tambah lapangan di sini. Tiap lapangan bisa jalan satu match.",
+    en: "Add courts here. Each court runs one match at a time.",
+  },
+
+  // Step: smart matchmaking
+  "tour.matchTitle": { id: "Susun pasangan otomatis", en: "Auto-build pairings" },
+  "tour.matchBody": {
+    id: "Tap Smart Matchmaking buat nyusun pemain jadi satu match. Pilih modenya, sisanya app yang hitung.",
+    en: "Tap Smart Matchmaking to pair players into a match. Pick a mode and the app does the rest.",
+  },
+
+  // Step: leaderboard tab
+  "tour.scoreTitle": { id: "Pantau skor", en: "Track the score" },
+  "tour.scoreBody": {
+    id: "Livescore update otomatis tiap match selesai. Cek peringkat pemain di sini.",
+    en: "The livescore updates after every finished match. Check player rankings here.",
+  },
+
+  // Step: finish tab
+  "tour.finishTitle": { id: "Selesai & bagikan hasil", en: "Finish & share" },
+  "tour.finishBody": {
+    id: "Kalau mabar kelar, akhiri sesi di sini lalu bagikan hasilnya ke grup.",
+    en: "When the session ends, finish it here then share the result with your group.",
+  },
 } as const;
 
 export type DictKey = keyof typeof DICT;

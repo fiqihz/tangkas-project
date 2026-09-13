@@ -90,6 +90,7 @@ export function FinishScreen() {
       <Button
         variant="destructive"
         size="lg"
+        data-tour="finish-session"
         onClick={() => {
           haptic(15);
           setConfirming(true);

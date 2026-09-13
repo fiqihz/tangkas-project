@@ -193,6 +193,7 @@ export function SessionsListScreen() {
         onClick={() => setCreating(true)}
         icon={<Plus size={22} />}
         label={t("sessions.fab")}
+        dataTour="create-session"
       />
 
       {creating && <CreateSessionDialog onClose={() => setCreating(false)} />}

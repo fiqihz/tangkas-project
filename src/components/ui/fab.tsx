@@ -10,14 +10,18 @@ export function Fab({
   icon,
   label,
   className,
+  dataTour,
 }: {
   onClick: () => void;
   icon: React.ReactNode;
   label?: string;
   className?: string;
+  /** Anchor untuk walkthrough (atribut data-tour). */
+  dataTour?: string;
 }) {
   return (
     <motion.button
+      data-tour={dataTour}
       initial={{ scale: 0, opacity: 0 }}
       animate={{ scale: 1, opacity: 1 }}
       whileTap={{ scale: 0.9 }}

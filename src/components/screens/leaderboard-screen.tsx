@@ -26,7 +26,7 @@ export function LeaderboardScreen() {
 
   return (
     <div className="flex flex-col gap-3">
-      <div>
+      <div data-tour="leaderboard">
         <h2 className="font-display text-lg font-bold tracking-tight">
           {t("leaderboard.title")}
         </h2>

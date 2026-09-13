@@ -295,6 +295,7 @@ export function CourtsScreen() {
                         match berikutnya. */}
                     <Button
                       variant="info"
+                      data-tour="smart-matchmaking"
                       onClick={() => {
                         haptic(12);
                         setModeForCourt(court.id);
@@ -319,7 +320,7 @@ export function CourtsScreen() {
         );
       })}
 
-      <Fab onClick={addCourt} icon={<Plus size={22} />} label={t("courts.addCourt")} />
+      <Fab onClick={addCourt} icon={<Plus size={22} />} label={t("courts.addCourt")} dataTour="add-court" />
 
       {finishFor && (
         <FinishMatchDialog
@@ -625,6 +626,7 @@ function MatchView({
           <Button
             variant="info"
             className="flex-1"
+            data-tour="smart-matchmaking"
             onClick={onAutoFill}
           >
             <Wand2 size={16} />{" "}
