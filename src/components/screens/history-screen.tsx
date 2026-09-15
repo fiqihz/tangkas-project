@@ -1,7 +1,8 @@
 "use client";
 
 import { useMemo, useState } from "react";
-import { Clock, Pencil } from "lucide-react";
+import { Clock, Pencil, Search } from "lucide-react";
+import { Input } from "@/components/ui/input";
 import { LevelBadge } from "@/components/ui/level-badge";
 import type { Match, SessionPlayer } from "@/lib/domain/types";
 import { useSessionStore } from "@/lib/store/session-store";
@@ -14,6 +15,7 @@ export function HistoryScreen({ readOnly = false }: { readOnly?: boolean } = {})
   const { matches, players } = useSessionStore();
   const t = useT();
   const [editFor, setEditFor] = useState<Match | null>(null);
+  const [query, setQuery] = useState("");
 
   const byId = useMemo(() => new Map(players.map((p) => [p.id, p])), [players]);
 
@@ -24,7 +26,9 @@ export function HistoryScreen({ readOnly = false }: { readOnly?: boolean } = {})
     [matches],
   );
 
-  // kelompokkan per lapangan (pakai courtLabel snapshot; fallback courtId)
+  // kelompokkan per lapangan (pakai courtLabel snapshot; fallback courtId).
+  // matchNumber di-hitung SEBELUM filter agar "Match ke-N" tetap merujuk urutan
+  // asli di lapangan itu, tidak bergeser saat pencarian menyaring sebagian.
   const groups = useMemo(() => {
     const map = new Map<string, Match[]>();
     for (const m of past) {
@@ -33,12 +37,40 @@ export function HistoryScreen({ readOnly = false }: { readOnly?: boolean } = {})
       arr.push(m);
       map.set(key, arr);
     }
-    // urutkan match tiap lapangan by round
-    for (const arr of map.values()) {
-      arr.sort((a, b) => a.round - b.round || a.id.localeCompare(b.id));
-    }
-    return Array.from(map.entries());
+    // urutkan match tiap lapangan by round, lalu lampirkan nomor urut asli
+    return Array.from(map.entries()).map(([label, arr]) => {
+      const sorted = [...arr].sort(
+        (a, b) => a.round - b.round || a.id.localeCompare(b.id),
+      );
+      return [
+        label,
+        sorted.map((m, idx) => ({ match: m, matchNumber: idx + 1 })),
+      ] as const;
+    });
   }, [past]);
+
+  // Filter per nama pemain: match tampil bila salah satu dari 4 slot (teamA +
+  // teamB) namanya mengandung query. Grup yang jadi kosong disembunyikan.
+  const q = query.trim().toLowerCase();
+  const filteredGroups = useMemo(() => {
+    if (!q) return groups;
+    return groups
+      .map(([label, rows]) => {
+        const matched = rows.filter(({ match }) =>
+          [...match.teamA.playerIds, ...match.teamB.playerIds].some((id) =>
+            (byId.get(id)?.name ?? "").toLowerCase().includes(q),
+          ),
+        );
+        return [label, matched] as const;
+      })
+      .filter(([, rows]) => rows.length > 0);
+  }, [groups, q, byId]);
+
+  // Total match yang cocok dengan pencarian (untuk badge "N match ditemukan").
+  const matchCount = useMemo(
+    () => filteredGroups.reduce((sum, [, rows]) => sum + rows.length, 0),
+    [filteredGroups],
+  );
 
   return (
     <div className="flex flex-col gap-5">
@@ -56,34 +88,64 @@ export function HistoryScreen({ readOnly = false }: { readOnly?: boolean } = {})
           {t("history.empty")}
         </p>
       ) : (
-        groups.map(([label, list]) => (
-          <div key={label}>
-            <div className="mb-2 text-sm font-medium">
-              {label === "\u0000deleted" ? t("courts.deletedCourt") : label}
-            </div>
-            <div className="flex flex-col gap-2">
-              {list.map((m, idx) => (
-                <MatchHistoryRow
-                  key={m.id}
-                  match={m}
-                  matchNumber={idx + 1}
-                  byId={byId}
-                  t={t}
-                  // Mode read-only (dibuka dari hasil mabar finished): sembunyikan
-                  // tombol edit skor — host hanya melihat, tidak mengubah.
-                  onEdit={
-                    readOnly
-                      ? undefined
-                      : () => {
-                          haptic(10);
-                          setEditFor(m);
-                        }
-                  }
-                />
-              ))}
-            </div>
+        <>
+          <div className="relative">
+            <Search
+              size={16}
+              className="absolute left-3 top-1/2 -translate-y-1/2 text-muted-foreground"
+            />
+            <Input
+              placeholder={t("history.searchPlaceholder")}
+              value={query}
+              onChange={(e) => setQuery(e.target.value)}
+              className="pl-9"
+            />
           </div>
-        ))
+
+          {q && filteredGroups.length > 0 && (
+            <span className="w-fit rounded-md bg-primary/10 px-2 py-0.5 text-xs font-medium text-primary">
+              {t("history.searchCount", { n: matchCount })}
+            </span>
+          )}
+
+          {filteredGroups.length === 0 ? (
+            <p className="py-8 text-center text-sm text-muted-foreground">
+              {t("history.noMatchForSearch", { q: query.trim() })}
+            </p>
+          ) : (
+            filteredGroups.map(([label, rows]) => (
+              <div key={label}>
+                <div className="mb-2 text-sm font-medium">
+                  {label === "\u0000deleted"
+                    ? t("courts.deletedCourt")
+                    : label}
+                </div>
+                <div className="flex flex-col gap-2">
+                  {rows.map(({ match: m, matchNumber }) => (
+                    <MatchHistoryRow
+                      key={m.id}
+                      match={m}
+                      matchNumber={matchNumber}
+                      byId={byId}
+                      t={t}
+                      highlight={q}
+                      // Mode read-only (dibuka dari hasil mabar finished):
+                      // sembunyikan tombol edit skor — host hanya melihat.
+                      onEdit={
+                        readOnly
+                          ? undefined
+                          : () => {
+                              haptic(10);
+                              setEditFor(m);
+                            }
+                      }
+                    />
+                  ))}
+                </div>
+              </div>
+            ))
+          )}
+        </>
       )}
 
       {editFor && (
@@ -103,12 +165,15 @@ function MatchHistoryRow({
   byId,
   t,
   onEdit,
+  highlight,
 }: {
   match: Match;
   matchNumber: number;
   byId: Map<string, SessionPlayer>;
   t: ReturnType<typeof useT>;
   onEdit?: () => void;
+  /** Query pencarian aktif (lowercased). Nama yang cocok di-highlight. */
+  highlight?: string;
 }) {
   const name = (id: string) => byId.get(id)?.name ?? "?";
   const level = (id: string) => byId.get(id)?.level ?? null;
@@ -154,7 +219,7 @@ function MatchHistoryRow({
           {match.teamA.playerIds.map((id) => (
             <div key={id} className="flex flex-col gap-0.5">
               <span className={cn("truncate text-sm", aWon && "font-semibold")}>
-                {name(id)}
+                <HighlightedName name={name(id)} query={highlight} />
               </span>
               <LevelBadge level={level(id)} className="w-fit shrink-0" />
             </div>
@@ -210,7 +275,7 @@ function MatchHistoryRow({
           {match.teamB.playerIds.map((id) => (
             <div key={id} className="flex flex-col items-end gap-0.5">
               <span className={cn("truncate text-sm", bWon && "font-semibold")}>
-                {name(id)}
+                <HighlightedName name={name(id)} query={highlight} />
               </span>
               <LevelBadge level={level(id)} className="w-fit shrink-0" />
             </div>
@@ -218,6 +283,36 @@ function MatchHistoryRow({
         </div>
       </div>
     </div>
+  );
+}
+
+/**
+ * Render nama pemain dengan bagian yang cocok dengan `query` di-highlight.
+ * Pencocokan case-insensitive, hanya kemunculan pertama yang ditandai (nama
+ * pemain pendek → satu highlight sudah cukup). Tanpa query, render apa adanya.
+ */
+function HighlightedName({
+  name,
+  query,
+}: {
+  name: string;
+  query?: string;
+}) {
+  const q = query?.trim();
+  if (!q) return <>{name}</>;
+  const idx = name.toLowerCase().indexOf(q.toLowerCase());
+  if (idx === -1) return <>{name}</>;
+  const before = name.slice(0, idx);
+  const match = name.slice(idx, idx + q.length);
+  const after = name.slice(idx + q.length);
+  return (
+    <>
+      {before}
+      <mark className="rounded-sm bg-primary/25 px-0.5 text-inherit">
+        {match}
+      </mark>
+      {after}
+    </>
   );
 }
 

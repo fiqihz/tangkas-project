@@ -132,6 +132,18 @@ export const DICT = {
   "history.editScore": { id: "Edit skor", en: "Edit score" },
   "history.draw": { id: "Seri", en: "Draw" },
   "history.setsLabel": { id: "Set: {sets}", en: "Sets: {sets}" },
+  "history.searchPlaceholder": {
+    id: "Cari nama pemain…",
+    en: "Search player name…",
+  },
+  "history.noMatchForSearch": {
+    id: "Tidak ada match untuk \"{q}\".",
+    en: "No matches found for \"{q}\".",
+  },
+  "history.searchCount": {
+    id: "{n} match ditemukan",
+    en: "{n} matches found",
+  },
 
   // Leaderboard / Livescore
   "leaderboard.title": { id: "Livescore", en: "Livescore" },
