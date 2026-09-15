@@ -14,6 +14,7 @@ import type { Gender, Level } from "@/lib/domain/types";
 import { useSessionStore } from "@/lib/store/session-store";
 import { useT } from "@/lib/store/settings-store";
 import { useProfiles } from "@/lib/store/use-profiles";
+import { useRosterStats } from "@/lib/store/use-roster-stats";
 import type { DbPlayerProfile } from "@/lib/supabase/types";
 import { cn } from "@/lib/utils";
 
@@ -34,6 +35,10 @@ export function AddPlayerDialog({
   const { addPlayer } = useSessionStore();
   const { profiles, create: createProfile, remove: removeProfile } =
     useProfiles();
+  // Jumlah "mabar" dihitung dari riwayat match yang selesai (sama seperti
+  // halaman Roster & Statistik), bukan dari counter tersimpan
+  // player_profile.sessions_played yang bisa drift/over-count.
+  const { statsById } = useRosterStats();
   const t = useT();
   const [tab, setTab] = useState<Tab>("roster");
 
@@ -55,6 +60,7 @@ export function AddPlayerDialog({
         {tab === "roster" ? (
           <RosterTab
             profiles={profiles}
+            sessionsById={statsById}
             existingNames={existingNames}
             onAdd={addPlayer}
             onDeleteProfile={removeProfile}
@@ -116,12 +122,15 @@ function TabBtn({
 
 function RosterTab({
   profiles,
+  sessionsById,
   existingNames,
   onAdd,
   onDeleteProfile,
   onClose,
 }: {
   profiles: DbPlayerProfile[];
+  /** profileId -> statistik lintas-mabar (untuk jumlah mabar yang akurat). */
+  sessionsById: Map<string, import("@/lib/domain/roster-stats").ProfileStats>;
   existingNames: Set<string>;
   onAdd: (p: {
     name: string;
@@ -248,7 +257,9 @@ function RosterTab({
                         height={12}
                         className="h-3 w-3 shrink-0 object-contain"
                       />
-                      {t("addPlayer.sessionsPlayed", { n: p.sessions_played })}
+                      {t("addPlayer.sessionsPlayed", {
+                        n: sessionsById.get(p.id)?.sessions ?? 0,
+                      })}
                     </div>
                   </div>
                 </div>
