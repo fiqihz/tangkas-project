@@ -25,6 +25,12 @@ pemenang match ditentukan mayoritas set, dan skor imbang tercatat sebagai **seri
 skalanya. Bonus **+M** ikut disesuaikan ke rata-rata poin-per-set liga. Murni
 **display-layer** (data per-set di DB tidak berubah).
 
+**Enhancement Import Daftar Pemain sudah diimplementasi & di-push ke `main`**
+(lihat §22) — host menempel daftar peserta apa adanya dari grup WhatsApp, sistem
+membersihkan formatnya, mencocokkan nama ke roster (persis & **fuzzy**), membuat
+profil baru untuk yang belum ada, dan menandai **Lunas** dari centang ✅ —
+semuanya lewat satu layar preview yang bisa dikoreksi.
+
 ---
 
 ## 1. Tujuan
@@ -729,9 +735,10 @@ berbasis rata-rata liga.
 
 ## 22. Enhancement — Import Daftar Pemain (tempel dari WhatsApp)
 
-Status: **diimplementasi & di-push ke `main`**. Menghapus pekerjaan manual paling
-membosankan buat host: mendaftarkan 15–20 peserta satu per satu padahal
-daftarnya sudah ada di grup WhatsApp. Dikerjakan via Vibe.
+Status: **diimplementasi & di-push ke `main`** (2 commit: fitur `a437efb` +
+pemutakhiran dokumen ini). Menghapus pekerjaan manual paling membosankan buat
+host: mendaftarkan 15–20 peserta satu per satu padahal daftarnya sudah ada di
+grup WhatsApp. Dikerjakan via Vibe.
 
 ### Masalah
 Daftar peserta lahir di grup WA, bentuknya seperti ini:
@@ -769,16 +776,26 @@ lalu masuk ke tiap kartu pemain untuk menyalakan toggle "Sudah bayar".
   menyisipkan word joiner di awal baris, dan tanpa dibuang `"⁠nugroho"` tidak
   akan cocok dengan `"Nugroho"` di roster sehingga malah membuat profil kembar.
 - **Penomoran & bullet dibuang**: `1.` `02)` `3 -` `7:` `- ` `• ` `–` dst.
-- **Penanda lunas**: simbol `✅ ✔ ✓ ☑ 💰` (dengan/tanpa VS-16) atau kata
-  `lunas` / `paid` / `sudah bayar`. **Negasi menang**: baris ber-`belum`/`blm`
+- **Penanda lunas**: simbol `✅ ✔ ✓ ☑ 🗸 💰 💵 💸` (dengan/tanpa VS-16) atau kata
+  `lunas` / `paid` / `settled` / `sudah|sdh|udah|udh|dah` + `bayar|tf|transfer`.
+  Penanda dideteksi pada baris **utuh**, jadi posisinya bebas (`✅ Ryan` maupun
+  `Ryan ✅`). **Negasi menang**: baris ber-`belum`/`blm`/`unpaid`/`not yet`
   selalu dianggap belum bayar walau ada centang.
-- **Kata bertema pembayaran dibuang dari nama** (`bayar`, `tf`, `transfer`,
-  `cash`, `sudah`, `belum`, …) agar tidak nyangkut jadi bagian nama.
+- **Kata bertema pembayaran dibuang dari nama** (`bayar`, `byr`, `tf`,
+  `transfer`, `cash`, `sudah`, `sdh`, `udah`, `belum`, `blm`, …) agar tidak
+  nyangkut jadi bagian nama — tanpa ini `"Ryan belum bayar"` terbaca sebagai
+  nama `"Ryan Bayar"`.
 - Anotasi dalam tanda kurung dibuang (`Nyoman (bli)` → `Nyoman`), sisa simbol /
-  emoji dibersihkan, nama di-Title Case mengikuti `toTitleCase` aplikasi.
-- Baris tanpa huruf (kosong, hanya nomor, hanya emoji) dilewati.
+  emoji dibersihkan, nama di-Title Case mengikuti `toTitleCase` aplikasi (jadi
+  kapital hanya di awal kata yang dipisah spasi: `Ade-Putra` → `Ade-putra`).
+- Baris tanpa huruf (kosong, hanya nomor, hanya emoji, atau hanya kata
+  pembayaran seperti `"belum bayar:"`) dilewati.
 - **Nama dobel dalam satu tempelan digabung**, status lunas di-OR (centang bisa
   menempel di salah satu penyebutan saja).
+- **Kunci pembanding nama** (`nameKey`) mengabaikan besar-kecil huruf,
+  diakritik (NFD + buang combining marks), dan tanda baca — `"José M."` dan
+  `"jose m"` dianggap nama yang sama. Kunci inilah yang dipakai untuk dedup,
+  pencocokan persis, dan mencocokkan kembali profil hasil bulk insert.
 
 ### Pencocokan nama ke roster
 Lima kategori hasil per baris: `exact` · `fuzzy` · `new` · `session` ·
@@ -863,22 +880,59 @@ mencoba lagi tanpa menempel ulang.
   berkelompok, checkbox per baris, pill Lunas/Belum yang bisa di-tap, segmented
   `Pakai <nama roster>` / `Bikin baru: <nama yang diketik>` untuk baris fuzzy,
   tombol **Ubah teks** untuk balik ke langkah tempel tanpa kehilangan teks.
+- Urutan grup preview: **fuzzy** (paling atas, border amber) → pemain baru →
+  dari roster → sudah di mabar → nama dobel. Baris dobel tetap ditampilkan
+  (dicoret, tanpa checkbox) supaya tidak terasa hilang diam-diam.
 - Tombol lanjut menyebut apa yang terbaca sebelum ditekan (**"Cek 17 nama"**),
   dan tombol eksekusi menyebut dampaknya (**"Tambah 16 pemain"**, atau
   **"Perbarui 3 status bayar"** bila tidak ada yang ditambah).
+- `AddPlayerDialog` kini membaca **`players` langsung dari session-store**, bukan
+  cuma prop `existingNames`, karena tab Import butuh `id` + status bayar tiap
+  pemain sesi (untuk menyinkronkan Lunas tanpa menambah pemain dobel). Setelah
+  import berhasil, roster di-`reload()` dulu sebelum sheet ditutup agar profil
+  baru langsung terlihat di tab Roster.
 - Wording dwibahasa di `dict.ts` prefix **`import.*`** + `addPlayer.import`.
 
 ### Tidak diubah
-Tidak ada migration baru — kolom `session_player.paid` sudah ada sejak migration
-`017`. Tab Roster & Pemain Baru tetap seperti sebelumnya (masih jalur tercepat
-untuk menambah 1–2 orang).
+- **Tidak ada migration baru** — kolom `session_player.paid` sudah ada sejak
+  migration `017`, jadi fitur ini bisa dideploy tanpa menyentuh DB.
+- Tab Roster & Pemain Baru tetap seperti sebelumnya (masih jalur tercepat untuk
+  menambah 1–2 orang), termasuk jalur lama `addPlayer` satu-per-satu.
+- `player_profile` tetap **tanpa unique constraint** pada `(community_id, name)`;
+  dedup sepenuhnya di sisi aplikasi seperti sebelumnya.
+
+### Known limitations
+- **Fuzzy bisa salah tebak.** `Tryan` vs `Ryan` hanya berjarak 1 edit (0.8), jadi
+  bila `Ryan` tidak ikut di tempelan, `Tryan` akan disarankan tertaut ke profil
+  `Ryan`. Mitigasinya bertingkat: default tidak menautkan di bawah 0.9, grup
+  fuzzy ditaruh paling atas dengan warna peringatan, dan hitungannya disebut di
+  ringkasan. Yang belum ada: **UI untuk menautkan ulang `session_player` ke
+  profil roster lain** setelah salah tautan tersimpan — ini kandidat perbaikan
+  berikutnya kalau kejadian di lapangan.
+- **Level & gender pemain baru dibiarkan kosong** (sesuai keputusan). Pemain
+  tanpa level tidak masuk pool auto-generate, jadi host tetap harus men-set level
+  sebelum matchmaking — sama seperti menambah pemain baru lewat tab Pemain Baru.
+- **Nama < 4 huruf tidak pernah di-fuzzy.** `Can`, `Adi`, `Edo` yang salah tulis
+  akan jadi pemain baru, bukan disarankan. Disengaja: pada nama sependek itu satu
+  huruf beda lebih sering berarti orang lain.
 
 ### Verifikasi
 Lolos `npm run typecheck` + `npm run lint` + `npm run test` (**53 test baru** di
-`import-players.test.ts`, total 144 passed + 3 skipped integration DB) +
-`npm run build` (exit 0). Test mencakup daftar WhatsApp asli host (17 nama,
-lengkap dengan word joiner), variasi format penomoran & penanda bayar, aturan
-alokasi profil, dan **4 property test** (fast-check): satu profil tak pernah
-diklaim dua baris, tiap baris hasil selalu punya nama berisi huruf, kekekalan
-jumlah baris terhadap kategori, dan pemain yang sudah di sesi tak pernah
-di-insert ulang.
+`import-players.test.ts`, total **147 passed + 3 skipped** — yang skip = test
+integrasi DB tanpa env) + `npm run build` (exit 0). Cakupan test: daftar WhatsApp
+asli host (17 nama, lengkap dengan word joiner — ternyata **11 bercentang**, bukan
+12), variasi format penomoran & penanda bayar, aturan alokasi profil (exact
+diklaim dulu, fuzzy tertinggi memilih dulu), kedua default di atas, dan **4
+property test** (fast-check): satu profil tak pernah diklaim dua baris, tiap baris
+hasil selalu punya nama berisi huruf, kekekalan jumlah baris terhadap kategori,
+dan pemain yang sudah di sesi tak pernah di-insert ulang.
+
+Selain itu render `ImportPlayersTab` di-smoke-test lewat `renderToStaticMarkup`
+(memastikan tak ada error runtime + placeholder contoh benar-benar terpasang).
+**Belum diuji interaksi di device asli** — itu masih di tangan host.
+
+> **Catatan untuk yang mengubah test ini:** generator nama di property test
+> sengaja dibatasi ke nama yang **lolos parser tanpa berubah**. Tanpa batasan itu
+> generator bisa memproduksi nama seperti `"a tf"` yang mengandung kata penanda
+> pembayaran, lalu test gagal karena artefak generator — bukan karena perilaku
+> pencocokan nama yang sedang diuji.
