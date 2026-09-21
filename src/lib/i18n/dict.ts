@@ -511,6 +511,104 @@ export const DICT = {
     en: "Gender (Can be changed anytime)",
   },
   "addPlayer.submit": { id: "Tambah pemain", en: "Add player" },
+  "addPlayer.import": { id: "Import", en: "Import" },
+
+  // Import daftar pemain (tempel dari WhatsApp/notes)
+  "import.hintFormat": {
+    id: "Tempel daftar nama dari WhatsApp atau notes — satu nama per baris. Penomoran (1. 2. 3.) otomatis dibuang.",
+    en: "Paste a name list from WhatsApp or notes — one name per line. Numbering (1. 2. 3.) is stripped automatically.",
+  },
+  "import.hintPaid": {
+    id: "Nama yang ada centang ✅ langsung ditandai Lunas. Nama yang sudah ada di roster otomatis dipakai ulang.",
+    en: "Names marked with ✅ are set as Paid. Names already in the roster are reused automatically.",
+  },
+  "import.placeholder": {
+    id: "1. Ryan ✅\n2. Nugroho ✅\n3. Fiqih\n4. Zakki",
+    en: "1. Ryan ✅\n2. Nugroho ✅\n3. Fiqih\n4. Zakki",
+  },
+  "import.textareaAria": {
+    id: "Daftar nama pemain untuk diimpor",
+    en: "Player name list to import",
+  },
+  "import.pasteFromClipboard": {
+    id: "Tempel dari clipboard",
+    en: "Paste from clipboard",
+  },
+  "import.clipboardEmpty": {
+    id: "Clipboard-nya kosong.",
+    en: "Clipboard is empty.",
+  },
+  "import.clipboardFailed": {
+    id: "Nggak bisa baca clipboard. Tempel manual aja ke kotak di atas.",
+    en: "Can't read the clipboard. Paste manually into the box above.",
+  },
+  "import.pasteFirst": { id: "Tempel daftar dulu", en: "Paste a list first" },
+  "import.reviewN": { id: "Cek {n} nama", en: "Review {n} names" },
+  "import.editText": { id: "Ubah teks", en: "Edit text" },
+  "import.importing": { id: "Mengimpor…", en: "Importing…" },
+  "import.nothingToAdd": {
+    id: "Nggak ada yang ditambah",
+    en: "Nothing to add",
+  },
+  "import.submitN": { id: "Tambah {n} pemain", en: "Add {n} players" },
+  "import.submitPaidOnly": {
+    id: "Perbarui {n} status bayar",
+    en: "Update {n} payment statuses",
+  },
+  "import.summaryTitle": {
+    id: "{n} pemain siap ditambah",
+    en: "{n} players ready to add",
+  },
+  "import.sumLinked": { id: "{n} dari roster", en: "{n} from roster" },
+  "import.sumCreated": { id: "{n} pemain baru", en: "{n} new players" },
+  "import.sumPaid": { id: "{n} Lunas", en: "{n} paid" },
+  "import.summaryReview": {
+    id: "{n} nama mirip roster — cek dulu sebelum lanjut",
+    en: "{n} names look similar to the roster — check before continuing",
+  },
+  "import.groupFuzzy": {
+    id: "Cek dulu — mirip nama di roster",
+    en: "Check first — similar to roster names",
+  },
+  "import.groupFuzzyHint": {
+    id: "Ejaannya beda tipis dari roster. Pastikan pilihannya bener: pakai profil roster, atau bikin pemain baru.",
+    en: "Spelling differs slightly from the roster. Pick the right one: reuse the roster profile, or create a new player.",
+  },
+  "import.groupNew": { id: "Pemain baru", en: "New players" },
+  "import.groupNewHint": {
+    id: "Bakal dibuat di roster. Level & gender dikosongin, bisa di-set kapan aja.",
+    en: "Will be created in the roster. Level & gender are left empty, set them anytime.",
+  },
+  "import.groupExact": { id: "Dari roster", en: "From roster" },
+  "import.groupExactHint": {
+    id: "Nama persis sama. Level & gender ikut kebawa dari roster.",
+    en: "Exact name match. Level & gender carry over from the roster.",
+  },
+  "import.groupSession": { id: "Sudah di mabar ini", en: "Already in this session" },
+  "import.groupSessionHint": {
+    id: "Nggak ditambah lagi. Status bayarnya masih bisa diperbarui dari sini.",
+    en: "Won't be added again. Their payment status can still be updated here.",
+  },
+  "import.groupDuplicate": { id: "Nama dobel", en: "Duplicate names" },
+  "import.groupDuplicateHint": {
+    id: "Disebut lebih dari sekali di daftar — dihitung sekali aja.",
+    en: "Mentioned more than once in the list — counted only once.",
+  },
+  "import.selectAria": { id: "Pilih {name}", en: "Select {name}" },
+  "import.lineNo": { id: "baris {n}", en: "line {n}" },
+  "import.typedAs": {
+    id: "· ditulis “{name}” · mirip {percent}%",
+    en: "· typed “{name}” · {percent}% similar",
+  },
+  "import.alreadyThere": { id: "· sudah terdaftar", en: "· already registered" },
+  "import.useSuggested": { id: "Pakai {name}", en: "Use {name}" },
+  "import.createNew": { id: "Bikin baru: {name}", en: "Create new: {name}" },
+  "import.paid": { id: "Lunas", en: "Paid" },
+  "import.unpaid": { id: "Belum", en: "Unpaid" },
+  "import.paidAria": {
+    id: "Ubah status bayar {name}",
+    en: "Toggle payment status for {name}",
+  },
 
   // Read-only result (finished session view)
   "result.readonly": {

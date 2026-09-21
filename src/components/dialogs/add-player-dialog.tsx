@@ -3,6 +3,7 @@
 import { useMemo, useState } from "react";
 import Image from "next/image";
 import { Check, Search, Trash2, UserPlus } from "lucide-react";
+import { ImportPlayersTab } from "@/components/dialogs/import-players-tab";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { LevelBadge } from "@/components/ui/level-badge";
@@ -18,12 +19,13 @@ import { useRosterStats } from "@/lib/store/use-roster-stats";
 import type { DbPlayerProfile } from "@/lib/supabase/types";
 import { cn } from "@/lib/utils";
 
-type Tab = "roster" | "new";
+type Tab = "roster" | "new" | "import";
 
 /**
  * Bottom sheet gabungan untuk menambah pemain ke sesi:
  *  - Tab "Roster": cari & pilih (multi-select) pemain tersimpan.
  *  - Tab "Baru": buat pemain baru (nama + level) sekaligus simpan ke roster.
+ *  - Tab "Import": tempel daftar nama (mis. dari grup WhatsApp) sekaligus.
  */
 export function AddPlayerDialog({
   existingNames,
@@ -33,8 +35,15 @@ export function AddPlayerDialog({
   onClose: () => void;
 }) {
   const { addPlayer } = useSessionStore();
-  const { profiles, create: createProfile, remove: removeProfile } =
-    useProfiles();
+  // Pemain sesi dibaca langsung dari store (bukan lewat prop existingNames)
+  // karena tab Import perlu id + status bayarnya, bukan cuma namanya.
+  const players = useSessionStore((s) => s.players);
+  const {
+    profiles,
+    create: createProfile,
+    remove: removeProfile,
+    reload: reloadProfiles,
+  } = useProfiles();
   // Jumlah "mabar" dihitung dari riwayat match yang selesai (sama seperti
   // halaman Roster & Statistik), bukan dari counter tersimpan
   // player_profile.sessions_played yang bisa drift/over-count.
@@ -55,6 +64,9 @@ export function AddPlayerDialog({
           <TabBtn active={tab === "new"} onClick={() => setTab("new")}>
             {t("addPlayer.newPlayer")}
           </TabBtn>
+          <TabBtn active={tab === "import"} onClick={() => setTab("import")}>
+            {t("addPlayer.import")}
+          </TabBtn>
         </div>
 
         {tab === "roster" ? (
@@ -65,6 +77,21 @@ export function AddPlayerDialog({
             onAdd={addPlayer}
             onDeleteProfile={removeProfile}
             onClose={onClose}
+          />
+        ) : tab === "import" ? (
+          <ImportPlayersTab
+            roster={profiles}
+            sessionPlayers={players.map((p) => ({
+              id: p.id,
+              name: p.name,
+              paid: p.paid,
+            }))}
+            onDone={async () => {
+              // Roster ikut dimuat ulang: import bisa menambah profil baru yang
+              // harus langsung terlihat di tab Roster.
+              await reloadProfiles();
+              onClose();
+            }}
           />
         ) : (
           <NewPlayerTab

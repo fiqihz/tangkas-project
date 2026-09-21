@@ -2,6 +2,10 @@
 
 import { create } from "zustand";
 import { MatchHistory } from "@/lib/domain/history";
+import {
+  nameKey,
+  type ImportExecutionPlan,
+} from "@/lib/domain/import-players";
 import { generateMatch } from "@/lib/domain/matchmaking";
 import { availablePool } from "@/lib/domain/queue";
 import { findSubstitute } from "@/lib/domain/substitute";
@@ -78,6 +82,22 @@ interface SessionState {
     profileId?: string | null;
     status?: PlayerStatus;
   }) => Promise<void>;
+  /**
+   * Eksekusi hasil import daftar pemain (lihat domain/import-players):
+   * buat profil roster yang belum ada, daftarkan semua pemain ke mabar, lalu
+   * sinkronkan status bayar pemain yang sudah lebih dulu terdaftar. Semuanya
+   * secara bulk + satu refresh di akhir.
+   */
+  importPlayers: (plan: ImportExecutionPlan) => Promise<{
+    ok: boolean;
+    /** Jumlah pemain yang berhasil didaftarkan ke mabar. */
+    added: number;
+    /** Jumlah profil roster baru yang dibuat. */
+    createdProfiles: number;
+    /** Jumlah pemain lama yang status bayarnya diperbarui. */
+    paidUpdated: number;
+    reason?: string;
+  }>;
   setPlayerLevel: (playerId: string, level: Level) => Promise<void>;
   setPlayerStatus: (playerId: string, status: PlayerStatus) => Promise<void>;
   setPlayerName: (playerId: string, name: string) => Promise<void>;
@@ -544,6 +564,90 @@ export const useSessionStore = create<SessionState>((set, get) => ({
       await get().refresh();
     } catch (e) {
       set({ actionError: `Gagal menambah pemain: ${describe(e)}.` });
+    }
+  },
+
+  async importPlayers(plan) {
+    const fail = (reason: string) => {
+      set({ actionError: reason });
+      return { ok: false, added: 0, createdProfiles: 0, paidUpdated: 0, reason };
+    };
+
+    const { session } = get();
+    if (!session) return fail("Belum ada mabar yang dibuka.");
+
+    const { inserts, paidUpdates } = plan;
+    if (inserts.length === 0 && paidUpdates.length === 0) {
+      return { ok: true, added: 0, createdProfiles: 0, paidUpdated: 0 };
+    }
+
+    const needProfile = inserts.filter((i) => i.needsProfile);
+    const communityId = activeCommunityId();
+    if (needProfile.length > 0 && !communityId) {
+      return fail("Belum ada community aktif. Pilih community dulu.");
+    }
+
+    try {
+      // 1. Profil roster baru dibuat lebih dulu supaya pemain hasil import
+      //    langsung tertaut ke roster (level & gender-nya bisa di-set nanti dan
+      //    akan persisten lintas mabar).
+      const newProfileIdByName = new Map<string, string>();
+      if (needProfile.length > 0 && communityId) {
+        const created = await repo.createProfiles(
+          needProfile.map((i) => ({ name: i.name, level: i.level, gender: i.gender })),
+          communityId,
+        );
+        // Dicocokkan lewat nama, bukan indeks: urutan hasil insert tidak dijamin.
+        for (const row of created) {
+          newProfileIdByName.set(nameKey(row.name), row.id);
+        }
+      }
+
+      // 2. Satu insert untuk semua pemain.
+      await repo.addSessionPlayers(
+        session.id,
+        inserts.map((i) => ({
+          name: i.name,
+          level: i.level,
+          gender: i.gender,
+          profileId: i.needsProfile
+            ? // Bila profil gagal dicocokkan kembali, pemain tetap didaftarkan
+              // tanpa tautan roster — masih bisa ditautkan lewat set level.
+              (newProfileIdByName.get(nameKey(i.name)) ?? null)
+            : i.profileId,
+          status: "registered" as const,
+          paid: i.paid,
+        })),
+      );
+
+      // 3. Sinkron status bayar pemain yang sudah terdaftar sebelumnya,
+      //    dikelompokkan jadi maksimal dua update.
+      const toPaid = paidUpdates.filter((u) => u.paid).map((u) => u.sessionPlayerId);
+      const toUnpaid = paidUpdates.filter((u) => !u.paid).map((u) => u.sessionPlayerId);
+      await Promise.all([
+        repo.setSessionPlayersPaid(toPaid, true),
+        repo.setSessionPlayersPaid(toUnpaid, false),
+      ]);
+
+      await get().refresh();
+      return {
+        ok: true,
+        added: inserts.length,
+        createdProfiles: newProfileIdByName.size,
+        paidUpdated: paidUpdates.length,
+      };
+    } catch (e) {
+      // Bila gagal di tengah jalan, sebagian profil roster mungkin sudah
+      // terbuat. Itu tidak merusak data mabar (hanya entri roster yang bisa
+      // dihapus manual), jadi cukup refresh agar UI sinkron dengan DB.
+      const reason = `Gagal mengimpor pemain: ${describe(e)}.`;
+      set({ actionError: reason });
+      try {
+        await get().refresh();
+      } catch {
+        // biarkan — pesan error utama sudah tampil
+      }
+      return { ok: false, added: 0, createdProfiles: 0, paidUpdated: 0, reason };
     }
   },
 

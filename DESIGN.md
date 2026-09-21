@@ -234,7 +234,7 @@ Migrations (di `supabase/migrations/`): `001` sessions_played, `002` match state
 ## 13. Halaman / Tab
 
 - **Daftar Mabar** (main page): list sesi + buat/kelola.
-- **Pemain**: tambah (dari roster searchable / pemain baru), search, check-in, set level, rest/pulang. FAB + Pemain.
+- **Pemain**: tambah (dari roster searchable / pemain baru / **import daftar tempelan** — lihat §22), search, check-in, set level, rest/pulang. FAB + Pemain.
 - **Lapangan**: kartu per lapangan (proposed/playing), Mulai Main / Finish, preview terkunci yang bisa diedit (tap pemain), popup aksi pemain, tambah/hapus/rename lapangan.
 - **Skor**: livescore leaderboard.
 - **History**: match per lapangan + edit skor.
@@ -250,8 +250,9 @@ Migrations (di `supabase/migrations/`): `001` sessions_played, `002` match state
 - Antrian jatah main (`queue.ts`)
 - History anti-repeat partner/lawan (`history.ts`)
 - Pengganti/substitusi (`substitute.ts`)
+- Parsing daftar pemain tempelan + pencocokan nama ke roster (exact & fuzzy) (`import-players.ts`)
 - Akumulasi skor, normalisasi poin/Diff **per set** (`perSetPlayerStats`), bonus tertinggal (basis rata-rata poin-per-set liga), win rate, tie-break (`leaderboard.ts` — lihat §21).
-- Tes: `domain.test.ts`, `rotation.test.ts`, `modes.test.ts`.
+- Tes: `domain.test.ts`, `rotation.test.ts`, `modes.test.ts`, `import-players.test.ts`.
 
 ---
 
@@ -273,6 +274,10 @@ Migrations (di `supabase/migrations/`): `001` sessions_played, `002` match state
   Poin & Diff dinormalisasi ke rata-rata per set (2-set vs 3-set setara), bonus
   +M disesuaikan ke rata-rata poin-per-set liga, display dibulatkan dengan sort
   desimal. Display-layer, backward-compatible.
+- **Import Daftar Pemain** — ✅ **selesai & di-push ke `main`** (lihat §22).
+  Host menempel daftar peserta dari WhatsApp; sistem mencocokkan ke roster
+  (persis & fuzzy), membuat pemain baru untuk yang belum ada, dan menandai Lunas
+  dari centang ✅.
 - **Dukungan tunggal (single)** — masih di roadmap (TangkasBoard fokus ganda 2v2).
 
 ---
@@ -719,3 +724,161 @@ Lolos `npm run typecheck` (exit 0) + `npm run test` (94 passed, 3 skipped —
 integration DB) + `npm run build` (Compiled successfully). Dua test baru di
 `domain.test.ts`: normalisasi per-set (skenario 2-set vs 3-set nyata) & bonus +M
 berbasis rata-rata liga.
+
+---
+
+## 22. Enhancement — Import Daftar Pemain (tempel dari WhatsApp)
+
+Status: **diimplementasi & di-push ke `main`**. Menghapus pekerjaan manual paling
+membosankan buat host: mendaftarkan 15–20 peserta satu per satu padahal
+daftarnya sudah ada di grup WhatsApp. Dikerjakan via Vibe.
+
+### Masalah
+Daftar peserta lahir di grup WA, bentuknya seperti ini:
+
+```
+1. Ryan ✅
+2. ⁠nugroho ✅
+3. ⁠Rusti ✅
+...
+17. ⁠awal ✅
+```
+
+Sebelum fitur ini host harus: buka tab Roster, cari nama satu-satu, centang,
+lalu untuk nama yang belum ada pindah ke tab Pemain Baru dan mengetik manual,
+lalu masuk ke tiap kartu pemain untuk menyalakan toggle "Sudah bayar".
+
+### Keputusan (locked)
+- **Tab ketiga di sheet Tambah Pemain** (`Dari Roster` | `Pemain Baru` |
+  `Import`), bukan tombol aksi langsung dan bukan sheet terpisah. Konteksnya
+  identik (mendaftarkan pemain ke mabar) dan sheet-nya sudah punya tab switcher.
+- **Dua langkah: tempel → preview → eksekusi.** Import menulis ke roster
+  permanen, jadi salah baca lebih murah ditangkap di layar preview ketimbang
+  dibersihkan satu-satu setelahnya. Preview mengelompokkan hasil per kategori
+  dan tiap baris masih bisa dikoreksi (dicentang/dilepas, ganti keputusan
+  tautan, ubah status bayar).
+- **Discoverability tanpa tooltip** (hover tidak ada di mobile): placeholder
+  textarea berisi contoh format sesungguhnya, plus dua baris hint permanen di
+  atas textarea (termasuk arti ✅). Tombol **Tempel dari clipboard** sebagai
+  jalan pintas, dengan fallback tempel manual bila browser menolak izin.
+- **Centang ✅ = Lunas.** Diisi langsung saat insert, bukan update menyusul.
+
+### Aturan parsing (`src/lib/domain/import-players.ts`, murni & teruji)
+- **Karakter tak terlihat dibuang** (`\u200B-\u200F`, `\u2060-\u2064`, word
+  joiner, soft hyphen, BOM, VS-16). Ini bukan kosmetik: tempelan WhatsApp
+  menyisipkan word joiner di awal baris, dan tanpa dibuang `"⁠nugroho"` tidak
+  akan cocok dengan `"Nugroho"` di roster sehingga malah membuat profil kembar.
+- **Penomoran & bullet dibuang**: `1.` `02)` `3 -` `7:` `- ` `• ` `–` dst.
+- **Penanda lunas**: simbol `✅ ✔ ✓ ☑ 💰` (dengan/tanpa VS-16) atau kata
+  `lunas` / `paid` / `sudah bayar`. **Negasi menang**: baris ber-`belum`/`blm`
+  selalu dianggap belum bayar walau ada centang.
+- **Kata bertema pembayaran dibuang dari nama** (`bayar`, `tf`, `transfer`,
+  `cash`, `sudah`, `belum`, …) agar tidak nyangkut jadi bagian nama.
+- Anotasi dalam tanda kurung dibuang (`Nyoman (bli)` → `Nyoman`), sisa simbol /
+  emoji dibersihkan, nama di-Title Case mengikuti `toTitleCase` aplikasi.
+- Baris tanpa huruf (kosong, hanya nomor, hanya emoji) dilewati.
+- **Nama dobel dalam satu tempelan digabung**, status lunas di-OR (centang bisa
+  menempel di salah satu penyebutan saja).
+
+### Pencocokan nama ke roster
+Lima kategori hasil per baris: `exact` · `fuzzy` · `new` · `session` ·
+`duplicate`. Urutan penyelesaian dari paling pasti ke paling spekulatif, supaya
+sistem tidak pernah menebak saat ada jawaban yang jelas:
+
+1. nama dobel di tempelan → `duplicate`
+2. persis sama dengan pemain di mabar ini → `session`
+3. persis sama dengan profil roster → `exact` (turun jadi `session` bila profil
+   itu ternyata sudah terdaftar di mabar)
+4. mirip dengan profil roster → `fuzzy`
+5. mirip dengan pemain di mabar → `session`
+6. tidak ada padanan → `new` (profil roster dibuat, level & gender **kosong**)
+
+**Skor kemiripan** (`nameSimilarity`, 0..1) = maksimum dari tiga heuristik yang
+masing-masing punya ambangnya sendiri:
+- **Jarak edit** ternormalisasi (Levenshtein, maksimum 2 edit, ambang 0.78) —
+  menangkap salah ketik: `Rusti` ~ `Rusty` (0.8).
+- **Awalan pada batas kata** (0.9) — menangkap nama panggilan vs nama lengkap:
+  `Awal` ~ `Awal Prasetyo`. Harus berhenti tepat di batas kata, jadi `Ryan`
+  **tidak** cocok dengan `Ryandika` (orang berbeda).
+- **Token pertama** (didiskon 0.95) — kombinasi keduanya: `Rusti` ~
+  `Rusty Wijaya`.
+
+Nama **< 4 huruf hanya diterima bila persis sama** (`Can` vs `Cak` terlalu mudah
+bertabrakan).
+
+**Alokasi profil**: satu profil roster hanya boleh diklaim satu baris. Semua
+kecocokan persis diklaim **lebih dulu** sebelum fuzzy dijalankan — tanpa ini,
+tempelan yang memuat `Rusty` dan `Rusti` sekaligus bisa membuat `Rusti` mencuri
+profil `Rusty`. Di antara baris fuzzy sendiri, yang kemiripannya tertinggi
+memilih lebih dulu (bukan urutan baris), jadi hasilnya tidak bergantung urutan
+tempelan. Kandidat dihitung sekali per baris (O(baris × roster)) lalu dibagikan
+greedy.
+
+### Dua default yang dipilih sengaja (asimetri akibat)
+1. **Tautan fuzzy tidak otomatis diterima di bawah `AUTO_LINK_SIMILARITY`
+   (0.9).** Salah menautkan berarti dua orang berbeda berbagi satu profil roster
+   → statistik lintas-mabar tercampur dan **tidak ada UI untuk memisahkannya
+   lagi**. Salah membuat baru hanya menyisakan entri roster kembar yang bisa
+   dihapus dari tab Roster. Jadi yang mahal dihindari; `Rusti` → `Rusty` (0.8)
+   butuh satu tap konfirmasi, `Awal` → `Awal Prasetyo` (0.9) langsung tertaut.
+   Kasus nyata yang dijaga: `Tryan` vs `Ryan` berjarak 1 edit (0.8) tapi dua
+   orang berbeda.
+2. **Status bayar tidak pernah diturunkan otomatis.** Pemain yang di mabar sudah
+   tercatat lunas tetap lunas walau tempelan tidak memuat centang untuknya —
+   host sering menempel ulang daftar lama hanya untuk menambah peserta baru, dan
+   itu tidak boleh membatalkan pembayaran yang sudah tercatat. Host tetap bisa
+   mematikannya secara eksplisit.
+
+Baris `fuzzy` ditempatkan **paling atas** di preview (border amber + hitungannya
+disebut di ringkasan) karena itu satu-satunya kategori yang keputusannya belum
+pasti.
+
+### Repo & store (bulk, bukan loop)
+Alur lama `RosterTab` melakukan satu `addSessionPlayer` **plus satu `refresh()`
+penuh** per pemain. Untuk 17 nama itu 17 insert + 17 refetch sesi, jadi import
+memakai jalur bulk baru:
+- `repo.createProfiles(rows, communityId)` — satu insert array untuk profil
+  roster baru. Hasilnya dicocokkan kembali **lewat nama** (`nameKey`), bukan
+  indeks, karena urutan baris hasil insert tidak dijamin.
+- `repo.addSessionPlayers(sessionId, players[])` — satu insert array. Payload
+  `NewSessionPlayer` sekarang menerima **`paid`** (sebelumnya kolom `paid` hanya
+  bisa diubah lewat update terpisah, dan tidak masuk whitelist
+  `updateSessionPlayer`).
+- `repo.setSessionPlayersPaid(ids, paid)` — sinkron status bayar pemain lama,
+  dikelompokkan jadi maksimal dua update (`true` & `false`).
+- `sessionStore.importPlayers(executionPlan)` — orkestrasi: buat profil → insert
+  pemain → sinkron bayar → **satu `refresh()`** di akhir; mengembalikan
+  `{ok, added, createdProfiles, paidUpdated}`.
+
+**Kegagalan sebagian**: bila insert pemain gagal setelah profil terbuat, sisa
+profil tetap ada di roster. Itu tidak merusak data mabar (hanya entri roster yang
+bisa dihapus manual), jadi tidak dibungkus RPC transaksional — pesan error
+tampil lewat `actionError` global dan preview dibiarkan utuh supaya host bisa
+mencoba lagi tanpa menempel ulang.
+
+### UI
+- `src/components/ui/textarea.tsx` — komponen baru, gaya mengikuti `Input`
+  (sebelumnya belum ada textarea di design system).
+- `src/components/dialogs/import-players-tab.tsx` — dua langkah, preview
+  berkelompok, checkbox per baris, pill Lunas/Belum yang bisa di-tap, segmented
+  `Pakai <nama roster>` / `Bikin baru: <nama yang diketik>` untuk baris fuzzy,
+  tombol **Ubah teks** untuk balik ke langkah tempel tanpa kehilangan teks.
+- Tombol lanjut menyebut apa yang terbaca sebelum ditekan (**"Cek 17 nama"**),
+  dan tombol eksekusi menyebut dampaknya (**"Tambah 16 pemain"**, atau
+  **"Perbarui 3 status bayar"** bila tidak ada yang ditambah).
+- Wording dwibahasa di `dict.ts` prefix **`import.*`** + `addPlayer.import`.
+
+### Tidak diubah
+Tidak ada migration baru — kolom `session_player.paid` sudah ada sejak migration
+`017`. Tab Roster & Pemain Baru tetap seperti sebelumnya (masih jalur tercepat
+untuk menambah 1–2 orang).
+
+### Verifikasi
+Lolos `npm run typecheck` + `npm run lint` + `npm run test` (**53 test baru** di
+`import-players.test.ts`, total 144 passed + 3 skipped integration DB) +
+`npm run build` (exit 0). Test mencakup daftar WhatsApp asli host (17 nama,
+lengkap dengan word joiner), variasi format penomoran & penanda bayar, aturan
+alokasi profil, dan **4 property test** (fast-check): satu profil tak pernah
+diklaim dua baris, tiap baris hasil selalu punya nama berisi huruf, kekekalan
+jumlah baris terhadap kategori, dan pemain yang sudah di sesi tak pernah
+di-insert ulang.

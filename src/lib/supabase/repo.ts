@@ -57,6 +57,32 @@ export async function createProfile(
   return data;
 }
 
+/**
+ * Buat beberapa profil roster sekaligus (satu round-trip).
+ * Dipakai fitur import daftar pemain: menempel 17 nama tidak perlu 17 insert
+ * terpisah. Urutan baris hasil tidak dijamin sama dengan `rows`, jadi pemanggil
+ * sebaiknya mencocokkan kembali lewat nama, bukan lewat indeks.
+ */
+export async function createProfiles(
+  rows: { name: string; level: Level | null; gender?: "male" | "female" | null }[],
+  communityId: string,
+): Promise<DbPlayerProfile[]> {
+  if (rows.length === 0) return [];
+  const { data, error } = await db()
+    .from("player_profile")
+    .insert(
+      rows.map((r) => ({
+        name: toTitleCase(r.name),
+        level: r.level,
+        gender: r.gender ?? null,
+        community_id: communityId,
+      })),
+    )
+    .select("*");
+  if (error) throw error;
+  return data ?? [];
+}
+
 export async function updateProfile(
   id: string,
   patch: Partial<Pick<DbPlayerProfile, "name" | "level" | "gender">>,
@@ -294,30 +320,62 @@ export async function listSessionPlayers(
   return data ?? [];
 }
 
+/** Pemain yang akan didaftarkan ke sebuah mabar. */
+export interface NewSessionPlayer {
+  name: string;
+  level: Level | null;
+  gender?: "male" | "female" | null;
+  profileId?: string | null;
+  status?: PlayerStatus;
+  /**
+   * Status bayar awal. Umumnya false (default kolom), tapi import daftar
+   * pemain bisa langsung menandai lunas dari centang di tempelan, sehingga
+   * tidak perlu update terpisah setelah insert.
+   */
+  paid?: boolean;
+}
+
+function toSessionPlayerInsert(sessionId: string, player: NewSessionPlayer) {
+  return {
+    session_id: sessionId,
+    profile_id: player.profileId ?? null,
+    name: toTitleCase(player.name),
+    level: player.level,
+    gender: player.gender ?? null,
+    status: player.status ?? "registered",
+    paid: player.paid ?? false,
+  };
+}
+
 export async function addSessionPlayer(
   sessionId: string,
-  player: {
-    name: string;
-    level: Level | null;
-    gender?: "male" | "female" | null;
-    profileId?: string | null;
-    status?: PlayerStatus;
-  },
+  player: NewSessionPlayer,
 ): Promise<DbSessionPlayer> {
   const { data, error } = await db()
     .from("session_player")
-    .insert({
-      session_id: sessionId,
-      profile_id: player.profileId ?? null,
-      name: toTitleCase(player.name),
-      level: player.level,
-      gender: player.gender ?? null,
-      status: player.status ?? "registered",
-    })
+    .insert(toSessionPlayerInsert(sessionId, player))
     .select("*")
     .single();
   if (error) throw error;
   return data;
+}
+
+/**
+ * Daftarkan beberapa pemain ke mabar sekaligus (satu round-trip).
+ * Dipakai fitur import: satu insert array + satu refresh, bukan N insert yang
+ * masing-masing memicu refresh penuh.
+ */
+export async function addSessionPlayers(
+  sessionId: string,
+  players: NewSessionPlayer[],
+): Promise<DbSessionPlayer[]> {
+  if (players.length === 0) return [];
+  const { data, error } = await db()
+    .from("session_player")
+    .insert(players.map((p) => toSessionPlayerInsert(sessionId, p)))
+    .select("*");
+  if (error) throw error;
+  return data ?? [];
 }
 
 export async function deleteSessionPlayer(id: string): Promise<void> {
@@ -512,6 +570,23 @@ export async function setSessionPlayerPaid(
     .from("session_player")
     .update({ paid })
     .eq("id", sessionPlayerId);
+  if (error) throw error;
+}
+
+/**
+ * Set status bayar untuk sekumpulan pemain ke nilai yang sama (satu
+ * round-trip). Dipakai import daftar pemain saat menyinkronkan centang lunas
+ * ke pemain yang sudah lebih dulu terdaftar di mabar.
+ */
+export async function setSessionPlayersPaid(
+  sessionPlayerIds: string[],
+  paid: boolean,
+): Promise<void> {
+  if (sessionPlayerIds.length === 0) return;
+  const { error } = await db()
+    .from("session_player")
+    .update({ paid })
+    .in("id", sessionPlayerIds);
   if (error) throw error;
 }
 
