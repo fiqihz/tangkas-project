@@ -31,6 +31,7 @@ import {
   type SessionPlayer,
 } from "@/lib/domain/types";
 import type { WaitingSummary } from "@/lib/domain/pool-insight";
+import { MatchHistory } from "@/lib/domain/history";
 import { useSessionStore } from "@/lib/store/session-store";
 import { useT } from "@/lib/store/settings-store";
 import {
@@ -65,6 +66,7 @@ export function CourtsScreen() {
     busyPlayerIds,
     reservableCandidates,
     session,
+    matches: allMatches,
   } = useSessionStore();
   const t = useT();
   // Apakah mode "Match Pertama (urut check-in)" boleh dipakai saat ini.
@@ -98,6 +100,33 @@ export function CourtsScreen() {
   } | null>(null);
 
   const byId = useMemo(() => new Map(players.map((p) => [p.id, p])), [players]);
+
+  // Riwayat pertemuan (partner) dari match yang sudah selesai di sesi ini.
+  // Dipakai untuk memberi flag "sudah partneran sebelumnya" pada pasangan yang
+  // akan main berikutnya (hasil smart matchmaking maupun swap manual). Reaktif
+  // terhadap `allMatches`, jadi otomatis dihitung ulang setiap kali susunan
+  // berubah (susun ulang, tukar pemain, atau match baru selesai).
+  const history = useMemo(
+    () => MatchHistory.fromMatches(allMatches),
+    [allMatches],
+  );
+  // Hitung flag partner-repeat untuk sebuah match (proposed/preview). Mengecek
+  // kedua tim: bila sepasang sudah pernah setim sebelumnya, kembalikan nama
+  // pasangan + berapa kali. Match yang sudah selesai dikecualikan dari riwayat
+  // oleh MatchHistory, jadi pengecekan tidak menghitung dirinya sendiri.
+  const partnerRepeatFlags = (m: Match): { pair: string; count: number }[] => {
+    const flags: { pair: string; count: number }[] = [];
+    for (const team of [m.teamA.playerIds, m.teamB.playerIds]) {
+      const [x, y] = team;
+      const count = history.partners(x, y);
+      if (count > 0) {
+        const nx = byId.get(x)?.name ?? "?";
+        const ny = byId.get(y)?.name ?? "?";
+        flags.push({ pair: `${nx} & ${ny}`, count });
+      }
+    }
+    return flags;
+  };
 
   // Match butuh dilengkapi bila ada pemain dengan level/gender belum di-set.
   const matchNeedsInfo = (m: Match) =>
@@ -243,6 +272,11 @@ export function CourtsScreen() {
                       matchNumber={courtMatchNumber(court.id, primary.id)}
                       byId={byId}
                       hasPreview={!!lockedPreview}
+                      partnerFlags={
+                        primary.state === "proposed"
+                          ? partnerRepeatFlags(primary)
+                          : []
+                      }
                       onAutoFill={() => {
                         haptic(12);
                         setModeForCourt(court.id);
@@ -261,6 +295,7 @@ export function CourtsScreen() {
                         preview={lockedPreview}
                         byId={byId}
                         playingIds={playingIds}
+                        partnerFlags={partnerRepeatFlags(lockedPreview)}
                         onTapPlayer={(playerId) =>
                           setPlayerAction({ match: lockedPreview, playerId })
                         }
@@ -506,6 +541,38 @@ function TeamBlock({
 }
 
 /**
+ * Flag "sudah partneran sebelumnya" — teks kuning yang muncul di bawah susunan
+ * pasangan berikutnya bila ada pasangan setim yang pernah partneran di sesi ini.
+ * Berlaku untuk hasil smart matchmaking maupun setelah host tukar pemain manual
+ * (dihitung ulang reaktif dari riwayat match yang sudah selesai).
+ */
+function PartnerRepeatFlags({
+  flags,
+}: {
+  flags: { pair: string; count: number }[];
+}) {
+  const t = useT();
+  if (flags.length === 0) return null;
+  return (
+    <div className="mt-2 flex flex-col gap-1">
+      {flags.map((f) => (
+        <p
+          key={f.pair}
+          className="flex items-start gap-1 text-xs font-medium text-amber-600 dark:text-amber-400"
+        >
+          <span className="shrink-0">⚠️</span>
+          <span>
+            {f.count > 1
+              ? t("courts.partnerRepeatN", { pair: f.pair, n: f.count })
+              : t("courts.partnerRepeat", { pair: f.pair })}
+          </span>
+        </p>
+      ))}
+    </div>
+  );
+}
+
+/**
  * Timer durasi match berjalan. Menampilkan mm:ss sejak `startedAt`, tick tiap
  * detik. Berubah warna jadi amber setelah 15 menit sebagai pengingat halus
  * bahwa match sudah lama (host bisa pertimbangkan rotasi).
@@ -544,6 +611,7 @@ function MatchView({
   matchNumber,
   byId,
   hasPreview,
+  partnerFlags = [],
   onAutoFill,
   onFinish,
   onStart,
@@ -553,6 +621,7 @@ function MatchView({
   matchNumber: number;
   byId: Map<string, SessionPlayer>;
   hasPreview: boolean;
+  partnerFlags?: { pair: string; count: number }[];
   onAutoFill: () => void;
   onFinish: () => void;
   onStart: () => void;
@@ -617,6 +686,7 @@ function MatchView({
           onTapPlayer={onTapPlayer}
         />
       </div>
+      {isProposed && <PartnerRepeatFlags flags={partnerFlags} />}
       {isProposed ? (
         <Button variant="info" onClick={onStart}>
           <Play size={16} /> {t("courts.startMatch")}
@@ -645,11 +715,13 @@ function LockedPreview({
   preview,
   byId,
   playingIds,
+  partnerFlags,
   onTapPlayer,
 }: {
   preview: Match;
   byId: Map<string, SessionPlayer>;
   playingIds: Set<string>;
+  partnerFlags: { pair: string; count: number }[];
   onTapPlayer: (playerId: string) => void;
 }) {
   const t = useT();
@@ -716,6 +788,7 @@ function LockedPreview({
           ))}
         </div>
       </div>
+      <PartnerRepeatFlags flags={partnerFlags} />
       {problem.length > 0 && (
         <p className="mt-2 text-xs text-destructive">
           ⚠️ {problem.map((id) => byId.get(id)?.name).join(", ")} sudah

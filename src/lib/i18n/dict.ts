@@ -74,6 +74,14 @@ export const DICT = {
     id: "⏭️ Main berikutnya (terkunci — tap pemain untuk ganti)",
     en: "⏭️ Up next (locked — tap a player to change)",
   },
+  "courts.partnerRepeat": {
+    id: "{pair} sudah partneran sebelumnya",
+    en: "{pair} have partnered before",
+  },
+  "courts.partnerRepeatN": {
+    id: "{pair} sudah partneran sebelumnya ({n}×)",
+    en: "{pair} have partnered before ({n}×)",
+  },
   "courts.deletedCourt": { id: "Lapangan (dihapus)", en: "Court (deleted)" },
   "courts.renameCourt": { id: "Ubah nama lapangan", en: "Rename court" },
   "courts.deleteCourt": { id: "Hapus lapangan", en: "Delete court" },
