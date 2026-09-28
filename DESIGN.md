@@ -952,3 +952,40 @@ Selain itu render `ImportPlayersTab` di-smoke-test lewat `renderToStaticMarkup`
 > generator bisa memproduksi nama seperti `"a tf"` yang mengandung kata penanda
 > pembayaran, lalu test gagal karena artefak generator — bukan karena perilaku
 > pencocokan nama yang sedang diuji.
+
+---
+
+## 23. Enhancement — Share Hasil sebagai Gambar
+
+Tombol **Bagikan** di Hasil Akhir & tampilan mabar selesai (read-only) membuka
+sheet **Bagikan hasil**: pilih ukuran → preview → bagikan.
+
+### Keputusan
+- **Dua ukuran**: Story 9:16 (1080×1920) dan Kotak 1:1 (1080×1080).
+- **Isi**: nama komunitas, nama mabar, tanggal, jumlah match & pemain, podium
+  2-1-3 (inisial dalam lingkaran warna medali, M/K + WR; juara 1 ditambah poin),
+  peringkat 4–8, lalu "+N pemain lain". Total kok & MVP sengaja tidak ditampilkan.
+- **Tema**: dark + aksen teal, motif garis lapangan samar. Watermark
+  "Dibuat dengan TangkasBoard" + domain app di footer.
+- **Dua langkah (preview dulu)**: gambar dibuat saat sheet dibuka, tombol
+  Bagikan baru memanggil Web Share. Safari iOS menolak share bila harus menunggu
+  render. Browser tanpa share file → tombol jadi **Simpan gambar** (unduh).
+  Opsi **Bagikan sebagai teks** tetap ada.
+
+### Implementasi
+- `src/lib/share-image.ts` — kontrak payload, `buildShareImagePayload` (dari
+  leaderboard layar), `parseShareImagePayload` (validasi & potong teks di server).
+- `src/app/api/share-image/route.tsx` — `POST`, render via `next/og`. **Wajib
+  login** (bearer token Supabase diverifikasi). Server tidak membaca DB; hanya
+  merender payload yang sudah divalidasi.
+- `src/app/api/share-image/share-card.tsx` — layout Satori (inline style, tanpa
+  emoji). Font Space Grotesk/Inter `.woff` di `asset/fonts/`, di-bundle lewat
+  `outputFileTracingIncludes` di `next.config.mjs`.
+- `src/components/dialogs/share-image-sheet.tsx` — sheet preview + share.
+
+### Perbaikan terkait
+- Teks share (`buildResultText`) kini wajib menerima `matches` → ranking sama
+  dengan layar (per-set, §21). Sebelumnya fallback ke total mentah.
+- Kolom **S** ditambahkan di Hasil Akhir; **S** & **WR** di tampilan read-only.
+- PWA: `start_url` → `/app`; service worker v2 (cache `/app`, lewati `/api/*` &
+  cross-origin, fallback offline navigasi `/app*` ke shell `/app`).

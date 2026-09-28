@@ -1,6 +1,8 @@
 // Service worker minimal untuk TangkasBoard (installable PWA + cache app shell).
-const CACHE = "tangkasboard-v1";
-const APP_SHELL = ["/", "/manifest.webmanifest"];
+// Naikkan versi CACHE bila APP_SHELL / strategi berubah: cache lama dihapus
+// otomatis di event activate.
+const CACHE = "tangkasboard-v2";
+const APP_SHELL = ["/", "/app", "/manifest.webmanifest"];
 
 self.addEventListener("install", (event) => {
   event.waitUntil(
@@ -22,17 +24,35 @@ self.addEventListener("activate", (event) => {
 
 self.addEventListener("fetch", (event) => {
   const { request } = event;
-  // Jangan cache API/Supabase — biarkan network yang handle.
-  if (request.method !== "GET" || request.url.includes("supabase")) {
+  const url = new URL(request.url);
+  // Jangan cache API/Supabase/route API app — biarkan network yang handle.
+  if (
+    request.method !== "GET" ||
+    url.origin !== self.location.origin ||
+    url.pathname.startsWith("/api/")
+  ) {
     return;
   }
   event.respondWith(
     fetch(request)
       .then((res) => {
-        const copy = res.clone();
-        caches.open(CACHE).then((cache) => cache.put(request, copy));
+        // Hanya simpan respons sukses agar halaman error tidak ikut ter-cache.
+        if (res.ok) {
+          const copy = res.clone();
+          caches.open(CACHE).then((cache) => cache.put(request, copy));
+        }
         return res;
       })
-      .catch(() => caches.match(request).then((r) => r || caches.match("/"))),
+      .catch(async () => {
+        const cached = await caches.match(request);
+        if (cached) return cached;
+        // Offline & belum ter-cache: navigasi di dalam app jatuh ke shell
+        // /app (bukan landing), selain itu ke landing.
+        if (request.mode === "navigate") {
+          const fallback = url.pathname.startsWith("/app") ? "/app" : "/";
+          return (await caches.match(fallback)) ?? Response.error();
+        }
+        return Response.error();
+      }),
   );
 });

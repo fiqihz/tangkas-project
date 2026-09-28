@@ -220,6 +220,8 @@ interface SessionState {
     matches: Match[];
     /** Poin 5: apakah mabar ini mencatat pemakaian kok. */
     trackShuttlecocks: boolean;
+    /** Tanggal mabar (jadwal, atau waktu dibuat) — untuk gambar share. */
+    dateIso: string | null;
   } | null;
   clearFinishedResult: () => void;
 }
@@ -541,6 +543,7 @@ export const useSessionStore = create<SessionState>((set, get) => ({
         players: players.filter((p) => p.gamesPlayed > 0),
         matches,
         trackShuttlecocks: session.track_shuttlecocks ?? false,
+        dateIso: session.scheduled_at ?? session.created_at ?? null,
       },
       // keluar dari board; setelah tutup Final Result -> kembali ke list
       session: null,

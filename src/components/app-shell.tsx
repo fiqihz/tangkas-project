@@ -1,6 +1,6 @@
 "use client";
 
-import { useEffect, useState } from "react";
+import { useEffect, useMemo, useState } from "react";
 import Image from "next/image";
 import { motion } from "framer-motion";
 import {
@@ -17,7 +17,8 @@ import { useSessionStore } from "@/lib/store/session-store";
 import { useSettingsStore, useT } from "@/lib/store/settings-store";
 import { SettingsScreen } from "@/components/screens/settings-screen";
 import { useOnlineStatus } from "@/lib/use-online-status";
-import { buildResultText, shareResultText } from "@/lib/share-result";
+import { buildResultText } from "@/lib/share-result";
+import { ShareImageSheet } from "@/components/dialogs/share-image-sheet";
 import { haptic } from "@/lib/haptics";
 import { cn } from "@/lib/utils";
 import { buildLeaderboard } from "@/lib/domain/leaderboard";
@@ -51,6 +52,7 @@ export function AppShell() {
   const actionError = useSessionStore((s) => s.actionError);
   const clearActionError = useSessionStore((s) => s.clearActionError);
   const online = useOnlineStatus();
+  const t = useT();
   const hydrateSettings = useSettingsStore((s) => s.hydrate);
   const maybeAutoStartTour = useTourStore((s) => s.maybeAutoStart);
 
@@ -68,7 +70,7 @@ export function AppShell() {
       {!online && (
         <div className="fixed inset-x-0 top-0 z-50 flex items-center justify-center gap-2 bg-destructive px-4 py-1.5 text-center text-xs font-medium text-destructive-foreground pt-[calc(env(safe-area-inset-top)+0.375rem)]">
           <WifiOff size={13} className="shrink-0" />
-          Kamu sedang offline — perubahan mungkin gagal tersimpan.
+          {t("app.offline")}
         </div>
       )}
       <AppShellContent />
@@ -129,6 +131,7 @@ function AppShellContent() {
         players={finishedResult.players}
         matches={finishedResult.matches}
         trackShuttlecocks={finishedResult.trackShuttlecocks}
+        dateIso={finishedResult.dateIso}
       />
     );
   }
@@ -238,21 +241,26 @@ function AppShellContent() {
 function ReadOnlyResult() {
   const { session, players, matches, backToList } = useSessionStore();
   const t = useT();
-  const rows = buildLeaderboard(players.filter((p) => p.gamesPlayed > 0), matches);
+  const played = useMemo(() => players.filter((p) => p.gamesPlayed > 0), [players]);
+  const rows = useMemo(() => buildLeaderboard(played, matches), [played, matches]);
+  const matchCount = useMemo(
+    () => matches.filter((m) => m.state === "finished").length,
+    [matches],
+  );
+  const resultText = useMemo(
+    () => buildResultText(session?.name ?? "", played, matches),
+    [session?.name, played, matches],
+  );
   const [toast, setToast] = useState<string | null>(null);
+  const [shareOpen, setShareOpen] = useState(false);
   // Tab di layar hasil finished: "result" (leaderboard) + "history" (daftar
   // match per lapangan, read-only) agar host bisa menengok tiap skor match.
   const [resultTab, setResultTab] = useState<"result" | "history">("result");
 
-  const share = async () => {
+  const share = () => {
     if (!session) return;
     haptic(12);
-    const outcome = await shareResultText(
-      buildResultText(session.name, players.filter((p) => p.gamesPlayed > 0)),
-    );
-    if (outcome === "copied") setToast(t("result.copied"));
-    else if (outcome === "failed")
-      setToast(t("result.shareFailed"));
+    setShareOpen(true);
   };
 
   return (
@@ -338,6 +346,8 @@ function ReadOnlyResult() {
                   <th className="px-2 py-2 text-left">{t("leaderboard.colPlayer")}</th>
                   <th className="px-2 py-2 text-center">M</th>
                   <th className="px-2 py-2 text-center">K</th>
+                  <th className="px-2 py-2 text-center">S</th>
+                  <th className="px-2 py-2 text-center">WR</th>
                   <th
                     className="px-2 py-2 text-center"
                     title={t("leaderboard.bonusTitle")}
@@ -369,6 +379,10 @@ function ReadOnlyResult() {
                     <td className="px-2 py-2 font-medium">{r.name}</td>
                     <td className="px-2 py-2 text-center">{r.wins}</td>
                     <td className="px-2 py-2 text-center">{r.losses}</td>
+                    <td className="px-2 py-2 text-center">{r.draws}</td>
+                    <td className="px-2 py-2 text-center text-muted-foreground">
+                      {r.winRate}%
+                    </td>
                     <td className="px-2 py-2 text-center text-primary">
                       {r.bonusDisplay > 0 ? `+${r.bonusDisplay}` : "-"}
                     </td>
@@ -385,6 +399,18 @@ function ReadOnlyResult() {
         )}
       </main>
 
+      {session && (
+        <ShareImageSheet
+          open={shareOpen}
+          onOpenChange={setShareOpen}
+          sessionName={session.name}
+          dateIso={session.scheduled_at ?? session.created_at ?? null}
+          matchCount={matchCount}
+          rows={rows}
+          resultText={resultText}
+          onToast={setToast}
+        />
+      )}
       <Toast message={toast} onClose={() => setToast(null)} />
     </div>
   );

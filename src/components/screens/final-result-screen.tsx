@@ -9,7 +9,9 @@ import { buildLeaderboard } from "@/lib/domain/leaderboard";
 import { shuttlecockStats } from "@/lib/domain/shuttlecock";
 import type { Match, SessionPlayer } from "@/lib/domain/types";
 import { useSessionStore } from "@/lib/store/session-store";
-import { buildResultText, shareResultText } from "@/lib/share-result";
+import { useT } from "@/lib/store/settings-store";
+import { buildResultText } from "@/lib/share-result";
+import { ShareImageSheet } from "@/components/dialogs/share-image-sheet";
 import { haptic } from "@/lib/haptics";
 import { cn } from "@/lib/utils";
 
@@ -23,14 +25,18 @@ export function FinalResultScreen({
   players,
   matches = [],
   trackShuttlecocks = false,
+  dateIso = null,
 }: {
   name: string;
   players: SessionPlayer[];
   matches?: Match[];
   trackShuttlecocks?: boolean;
+  dateIso?: string | null;
 }) {
   const { clearFinishedResult } = useSessionStore();
+  const t = useT();
   const [toast, setToast] = useState<string | null>(null);
+  const [shareOpen, setShareOpen] = useState(false);
 
   const rows = useMemo(() => buildLeaderboard(players, matches), [players, matches]);
   const podium = rows.slice(0, 3);
@@ -42,13 +48,18 @@ export function FinalResultScreen({
     clearFinishedResult();
   };
 
-  const share = async () => {
+  const matchCount = useMemo(
+    () => matches.filter((m) => m.state === "finished").length,
+    [matches],
+  );
+  const resultText = useMemo(
+    () => buildResultText(name, players, matches),
+    [name, players, matches],
+  );
+
+  const share = () => {
     haptic(12);
-    const outcome = await shareResultText(buildResultText(name, players));
-    if (outcome === "copied") setToast("Hasil disalin ke clipboard.");
-    else if (outcome === "failed")
-      setToast("Gagal membagikan hasil. Coba lagi.");
-    // 'shared' -> tidak perlu toast (share sheet HP sudah muncul)
+    setShareOpen(true);
   };
 
   return (
@@ -65,7 +76,7 @@ export function FinalResultScreen({
 
         {rows.length === 0 ? (
           <p className="mt-10 text-center text-sm text-muted-foreground">
-            Tidak ada pemain yang bermain di sesi ini.
+            {t("result.noPlayers")}
           </p>
         ) : (
           <>
@@ -77,9 +88,10 @@ export function FinalResultScreen({
                   <thead className="bg-secondary text-xs text-muted-foreground">
                     <tr>
                       <th className="px-1.5 py-2 text-left">#</th>
-                      <th className="px-1.5 py-2 text-left">Pemain</th>
+                      <th className="px-1.5 py-2 text-left">{t("leaderboard.colPlayer")}</th>
                       <th className="px-1.5 py-2 text-center">M</th>
                       <th className="px-1.5 py-2 text-center">K</th>
+                      <th className="px-1.5 py-2 text-center">S</th>
                       <th className="px-1.5 py-2 text-center">WR</th>
                       <th className="px-1.5 py-2 text-center">+M</th>
                       <th className="px-1.5 py-2 text-center">Diff</th>
@@ -96,6 +108,7 @@ export function FinalResultScreen({
                         <td className="px-1.5 py-2 font-medium">{r.name}</td>
                         <td className="px-1.5 py-2 text-center">{r.wins}</td>
                         <td className="px-1.5 py-2 text-center">{r.losses}</td>
+                        <td className="px-1.5 py-2 text-center">{r.draws}</td>
                         <td className="px-1.5 py-2 text-center text-muted-foreground">
                           {r.winRate}%
                         </td>
@@ -149,6 +162,16 @@ export function FinalResultScreen({
         </Button>
       </div>
 
+      <ShareImageSheet
+        open={shareOpen}
+        onOpenChange={setShareOpen}
+        sessionName={name}
+        dateIso={dateIso}
+        matchCount={matchCount}
+        rows={rows}
+        resultText={resultText}
+        onToast={setToast}
+      />
       <Toast message={toast} onClose={() => setToast(null)} />
     </div>
   );

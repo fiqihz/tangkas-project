@@ -628,6 +628,44 @@ export const DICT = {
   "result.tabResult": { id: "Hasil", en: "Result" },
   "result.tabHistory": { id: "History", en: "History" },
 
+  "app.offline": {
+    id: "Kamu sedang offline — perubahan mungkin gagal tersimpan.",
+    en: "You're offline — changes may fail to save.",
+  },
+
+  // Share hasil sebagai gambar (sheet preview di app)
+  "shareSheet.title": { id: "Bagikan hasil", en: "Share result" },
+  "shareSheet.desc": {
+    id: "Pilih ukuran, cek preview, lalu bagikan ke grup atau story.",
+    en: "Pick a size, check the preview, then share to a group or story.",
+  },
+  "shareSheet.story": { id: "Story 9:16", en: "Story 9:16" },
+  "shareSheet.square": { id: "Kotak 1:1", en: "Square 1:1" },
+  "shareSheet.generating": { id: "Menyiapkan gambar…", en: "Preparing image…" },
+  "shareSheet.error": {
+    id: "Gagal membuat gambar. Cek koneksi lalu coba lagi.",
+    en: "Couldn't create the image. Check your connection and try again.",
+  },
+  "shareSheet.retry": { id: "Coba lagi", en: "Try again" },
+  "shareSheet.shareImage": { id: "Bagikan gambar", en: "Share image" },
+  "shareSheet.saveImage": { id: "Simpan gambar", en: "Save image" },
+  "shareSheet.shareText": { id: "Bagikan sebagai teks", en: "Share as text" },
+  "shareSheet.saved": { id: "Gambar tersimpan.", en: "Image saved." },
+  "shareSheet.previewAlt": {
+    id: "Preview gambar hasil {name}",
+    en: "Result image preview for {name}",
+  },
+
+  // Teks di dalam gambar hasil (dirender server, next/og)
+  "shareImage.finalResult": { id: "Hasil Akhir", en: "Final Result" },
+  "shareImage.matches": { id: "{n} match", en: "{n} matches" },
+  "shareImage.players": { id: "{n} pemain", en: "{n} players" },
+  "shareImage.wl": { id: "{w}M · {l}K", en: "{w}W · {l}L" },
+  "shareImage.winRate": { id: "WR {n}%", en: "WR {n}%" },
+  "shareImage.points": { id: "{n} poin", en: "{n} pts" },
+  "shareImage.more": { id: "+{n} pemain lain", en: "+{n} more players" },
+  "shareImage.madeWith": { id: "Dibuat dengan", en: "Made with" },
+
   // ==========================================================================
   // LANDING PAGE
   // ==========================================================================
