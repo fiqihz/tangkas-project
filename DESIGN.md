@@ -224,16 +224,29 @@ Multi-tenant nyata (Opsi C aktif sejak Fase 2, lihat §18):
 - **match_set** — skor **per set** dari sebuah match: `match_id`, `set_no`, `score_a`, `score_b` (unik per `match_id`+`set_no`). Sumber detail set; agregat di `match` tetap dipakai konsumen lama (leaderboard, roster stats lintas-mabar). Lihat §20.
 
 **RLS ketat per-community** menggantikan policy permisif anon `using(true)` lama.
-Helper `is_member()` / `has_role()` (SECURITY DEFINER): tabel induk (`community`,
-`player_profile`, `session`) mengecek `is_member(community_id)`; tabel anak
-(`session_player`, `court`, `match`) mengecek via join ke `session.community_id`.
-Write hanya untuk `authenticated`, dan operasi tulis `membership`/`invite`/pembuatan
-community dilakukan lewat RPC SECURITY DEFINER. Realtime aktif di `match`,
-`session_player`, `court`, `session`, `match_set`. `match_set` mengikuti pola RLS
-permisif tabel data (allow-all untuk anon/authenticated) — konsisten dengan tabel
-sesi lain.
+Helper `is_member()` / `has_role()` (SECURITY DEFINER). Sejak migration `021`,
+tiap tabel data punya dua policy (hanya untuk `authenticated`, anon tidak punya
+akses sama sekali):
 
-Migrations (di `supabase/migrations/`): `001` sessions_played, `002` match state unfinished, `003` multi-status sesi, `004` match court_label, `005` checked_in_at, `006` gender (kolom `gender` di `player_profile` & `session_player`), `007` RPC atomik, `008` realtime filters, `009` match started_at, `010` **feedback** (tabel masukan landing + RLS anon insert-only), `011` **trigger notifikasi feedback** (via `net.http_post` → Edge Function, bypass UI Webhook), `012` **membership & invite** (enum `membership_role`/`invite_status`), `013` **RLS ketat + helper functions** (`is_member`/`has_role`), `014` **trigger `pg_net` → Edge Function `send-invite`**, `015` **RPC** (`create_community_with_owner`, `claim_legacy_data`, `redeem_invite`, `kick_member`), `016` **`redeem_invite` email-bound + `list_community_members_with_email`**, `017` **shuttlecock & paid** (`session.track_shuttlecocks`, `match.shuttlecocks`, `session_player.paid` + `finish_match_atomic` tambah `p_shuttlecocks`), `018` **multi-set** (`session.sets_target`, tabel `match_set`, RPC `finish_set_atomic` & `edit_match_sets_atomic`, realtime `match_set`), `019` **carry-over kok** (`finish_set_atomic` simpan `match.shuttlecocks` tiap set, bukan hanya saat final).
+- **`<tabel>_read`** (SELECT) — anggota community (`is_member`).
+- **`<tabel>_write`** (ALL) — owner/admin community
+  (`has_role(..., owner/admin)`). Role `member` jadi benar-benar read-only.
+
+Tabel induk (`player_profile`, `session`) mengecek `community_id` langsung; tabel
+anak (`session_player`, `court`, `match`) via join ke `session.community_id`;
+`match_set` via join `match → session`. `community` punya policy sendiri
+(select anggota, update owner/admin, delete owner). Operasi tulis
+`membership`/`invite`/pembuatan community lewat RPC SECURITY DEFINER.
+`claim_legacy_data` tidak bisa dipanggil langsung oleh client (hanya lewat
+`create_community_with_owner`). Realtime aktif di `match`, `session_player`,
+`court`, `session`, `match_set` dan tetap tunduk pada RLS.
+
+> Riwayat: sebelum `021`, `match_set` masih memakai policy allow-all untuk anon
+> (dari `018`) dan tulis tabel data cukup `is_member`. Keduanya sudah ditutup.
+
+Migrations (di `supabase/migrations/`, dijalankan berurutan — lihat
+`supabase/README.md`; `supabase/schema.sql` lama sudah dihapus karena usang dan
+memasang ulang policy allow-all): `000` base schema, `001` sessions_played, `002` match state unfinished, `003` multi-status sesi, `004` match court_label, `005` checked_in_at, `006` gender (kolom `gender` di `player_profile` & `session_player`), `007` RPC atomik, `008` realtime filters, `009` match started_at, `010` **feedback** (tabel masukan landing + RLS anon insert-only), `011` **trigger notifikasi feedback** (via `net.http_post` → Edge Function, bypass UI Webhook), `012` **membership & invite** (enum `membership_role`/`invite_status`), `013` **RLS ketat + helper functions** (`is_member`/`has_role`), `014` **trigger `pg_net` → Edge Function `send-invite`**, `015` **RPC** (`create_community_with_owner`, `claim_legacy_data`, `redeem_invite`, `kick_member`), `016` **`redeem_invite` email-bound + `list_community_members_with_email`**, `017` **shuttlecock & paid** (`session.track_shuttlecocks`, `match.shuttlecocks`, `session_player.paid` + `finish_match_atomic` tambah `p_shuttlecocks`), `018` **multi-set** (`session.sets_target`, tabel `match_set`, RPC `finish_set_atomic` & `edit_match_sets_atomic`, realtime `match_set`), `019` **carry-over kok** (`finish_set_atomic` simpan `match.shuttlecocks` tiap set, bukan hanya saat final), `020` **fix edit skor tim B** (`edit_match_sets_atomic` sebelumnya membalik tanda W/L tim B saat pemenang diedit → M/K bisa minus; diperbaiki + backfill ulang wins/losses/draws dari match `finished`), `021` **security hardening** (RLS `match_set` per-community, tulis tabel data khusus owner/admin, hapus sisa policy `*_all`, revoke eksekusi `claim_legacy_data`).
 
 ---
 
@@ -445,6 +458,9 @@ Menggantikan policy permisif anon `using(true)` lama:
 - Tabel anak (`session_player`, `court`, `match`) cek via join ke `session.community_id`.
 - Write hanya `authenticated`. Operasi tulis `membership`/`invite`/pembuatan
   community lewat RPC SECURITY DEFINER.
+- **Diperketat di migration `021`** (lihat §12): baca = anggota, tulis tabel data
+  = owner/admin saja, `match_set` ikut per-community, `claim_legacy_data` tidak
+  bisa dipanggil langsung.
 
 ### Migrasi data lama
 Baris dengan `community_id = DEFAULT_COMMUNITY_ID`

@@ -1,6 +1,6 @@
 # Setup Supabase — TangkasBoard
 
-Langkah sekali-jalan untuk menyiapkan database. Butuh ~5 menit.
+Langkah sekali-jalan untuk menyiapkan database baru.
 
 ## 1. Buat project Supabase
 
@@ -11,13 +11,24 @@ Langkah sekali-jalan untuk menyiapkan database. Butuh ~5 menit.
    - Region: pilih terdekat (mis. Singapore)
 3. Tunggu project selesai di-provision (~2 menit).
 
-## 2. Jalankan skema database
+## 2. Jalankan migration
 
-1. Di dashboard project, buka menu kiri **SQL Editor**.
-2. Klik **New query**.
-3. Buka file [`schema.sql`](./schema.sql), **copy semua isinya**, tempel ke editor.
-4. Klik **Run** (atau Ctrl/Cmd + Enter).
-5. Pastikan tidak ada error. Ini membuat semua tabel + komunitas default + RLS + realtime.
+Skema database dibangun dari file di [`migrations/`](./migrations), **berurutan
+dari `000` sampai nomor terakhir**. Jangan lompat, dan jangan jalankan satu file
+lama saja di database yang sudah jalan.
+
+1. Buka menu kiri **SQL Editor** → **New query**.
+2. Untuk tiap file `migrations/NNN_*.sql` (urut nomor): copy isinya, tempel, **Run**.
+3. Pastikan tidak ada error sebelum lanjut ke file berikutnya.
+
+Catatan penting:
+- `000_base_schema.sql` masih memasang policy permisif lama (`<tabel>_all`,
+  allow-all untuk anon). Policy itu dihapus oleh `013` dan `021`. Jadi **jangan
+  berhenti di tengah** — database baru baru aman setelah semua migration jalan.
+- Di database production, **jangan menjalankan ulang `000`** sendirian: itu akan
+  memasang lagi policy allow-all dan membuka data semua komunitas.
+- Dulu ada `supabase/schema.sql` (salinan `000` + multi-set). File itu sudah
+  dihapus karena usang dan berbahaya bila dijalankan di production.
 
 ## 3. Ambil URL & anon key
 
@@ -28,42 +39,42 @@ Langkah sekali-jalan untuk menyiapkan database. Butuh ~5 menit.
 
 ## 4. Isi environment variables
 
-Di root project, salin `.env.example` menjadi `.env` lalu isi:
+Di root project, salin `.env.example` menjadi `.env.local` lalu isi:
 
 ```
 NEXT_PUBLIC_SUPABASE_URL=https://xxxx.supabase.co
 NEXT_PUBLIC_SUPABASE_ANON_KEY=eyJhbGciOi...
-NEXT_PUBLIC_APP_PASSWORD=kode-rahasia-lu
 ```
 
-- `NEXT_PUBLIC_APP_PASSWORD` = password bersama (Opsi B). Bagikan hanya ke host tepercaya.
-- Kosongkan `NEXT_PUBLIC_APP_PASSWORD` bila ingin tanpa gembok (tidak disarankan).
+Secret Edge Function (`RESEND_API_KEY`, `FEEDBACK_TO`, `FEEDBACK_FROM`,
+`INVITE_FROM`, `APP_URL`, `WEBHOOK_SECRET`) **tidak** ditaruh di `.env` app —
+set lewat `supabase secrets set`.
 
-## 5. Cek koneksi
+## 5. Auth
 
-Jalankan app lokal:
+Aktifkan provider **Email** dan **Google** di **Authentication → Providers**.
+Login, onboarding (buat community), dan undangan admin berjalan lewat Supabase
+Auth + RPC di migration `015`/`016`.
+
+## 6. Cek koneksi
 
 ```
 npm run dev
 ```
 
-Buka http://localhost:3000. Bila env benar, app bisa baca/tulis ke Supabase.
+Buka http://localhost:3000/app, daftar akun, lalu buat community.
 
 ---
 
-## Catatan keamanan (Opsi B)
+## Model keamanan
 
-- Akses DB memakai **anon key** + RLS policy permisif (allow all).
-- Artinya siapa pun dengan URL app + password bisa baca/tulis data.
-- Ini sesuai kesepakatan: gembok ada di sisi app (1 password bersama).
-- **Jangan** commit `.env` atau sebar anon key/URL ke publik.
-
-## Jalan ke Opsi C (nanti)
-
-Skema sudah multi-tenant (semua data punya `community_id`). Untuk upgrade:
-1. Aktifkan Supabase Auth (login per user).
-2. Tambah tabel membership (user ↔ community + role).
-3. Perketat RLS policy: user hanya boleh akses community miliknya.
-4. Data lama (di Default Community) tinggal di-assign ke akun admin pertama.
-
-Tidak perlu merombak struktur tabel.
+- App memakai **anon key** + **Supabase Auth**. Anon key memang publik (ikut di
+  bundle browser); yang menjaga data adalah **RLS**.
+- RLS per-community (`013`, diperketat `021`):
+  - **Baca**: anggota community (`is_member`).
+  - **Tulis**: owner/admin community (`has_role`). Role `member` read-only.
+  - Tabel `match_set` mengikuti aturan yang sama lewat join `match → session`.
+- Operasi yang harus menembus RLS (buat community, tukar undangan, kick member)
+  lewat RPC `SECURITY DEFINER` yang mengecek `auth.uid()` / role pemanggil.
+- `claim_legacy_data` tidak bisa dipanggil langsung oleh client (`021`).
+- **Jangan** commit `.env` / `.env.local`.
