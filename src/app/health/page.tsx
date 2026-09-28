@@ -103,7 +103,7 @@ async function runChecks(setChecks: (c: Check[]) => void) {
         label: "Komunitas default",
         state: "fail",
         detail:
-          "Tabel 'community' terbaca tapi baris default tidak ada. Jalankan ulang schema.sql.",
+          "Tabel 'community' terbaca tapi baris default tidak ada. Cek migration di supabase/migrations/.",
       });
     } else {
       push({

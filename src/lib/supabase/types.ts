@@ -1,5 +1,5 @@
 // ============================================================================
-// Tipe baris database (selaras dengan supabase/schema.sql)
+// Tipe baris database (selaras dengan supabase/migrations/)
 // ============================================================================
 import type { Level, PlayerStatus } from "@/lib/domain/types";
 
